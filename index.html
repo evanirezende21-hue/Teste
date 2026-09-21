@@ -72,7 +72,7 @@
 
         <div class="form-group" id="group-plate" style="display: none;">
           <label>Placa da Moto</label>
-          <input type="text" id="user-plate" placeholder="Ex: PUH1179" />
+          <input type="text" id="user-plate" placeholder="Ex: ABC-1234" />
         </div>
 
         <button class="btn-primary" id="btn-login" onclick="entrarNoApp()">ENTRAR NO APP</button>
@@ -154,10 +154,11 @@
     let currentUser = null;
     let activeRideId = null;
     let pendingRide = null;
+    let passengerSubscription = null;
 
     let formCache = {
       passageiro: { name: '', phone: '' },
-      motorista: { name: 'Evanir', plate: 'PUH1179' }
+      motorista: { name: '', plate: '' }
     };
 
     let passengerMap, driverMap;
@@ -193,6 +194,9 @@
 
     window.onload = async () => {
       try {
+        const { data: mData } = await supabaseClient.from('motoristas').select('*').order('atualizado_em', { ascending: false }).limit(1);
+        if (mData && mData.length > 0) formCache.motorista = { name: mData[0].nome, plate: mData[0].placa };
+
         const { data: pData } = await supabaseClient.from('passageiros').select('*').order('criado_em', { ascending: false }).limit(1);
         if (pData && pData.length > 0) formCache.passageiro = { name: pData[0].nome, phone: pData[0].telefone };
 
@@ -222,8 +226,8 @@
         document.getElementById('user-name').value = formCache.passageiro.name || '';
         document.getElementById('user-phone').value = formCache.passageiro.phone || '';
       } else {
-        document.getElementById('user-name').value = formCache.motorista.name || 'Evanir';
-        document.getElementById('user-plate').value = formCache.motorista.plate || 'PUH1179';
+        document.getElementById('user-name').value = formCache.motorista.name || '';
+        document.getElementById('user-plate').value = formCache.motorista.plate || '';
       }
     }
 
@@ -264,7 +268,6 @@
         document.getElementById('passenger-screen').classList.add('active');
         initPassengerMap();
         carregarEExibirMotoristasNoMapa();
-        escutarAtualizacoesPassageiro();
       } else {
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
@@ -287,6 +290,7 @@
       currentUser = null;
       activeRideId = null;
       pendingRide = null;
+      if (passengerSubscription) supabaseClient.removeChannel(passengerSubscription);
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById('auth-screen').classList.add('active');
     }
@@ -395,6 +399,11 @@
       btn.disabled = true;
       btn.innerText = 'Enviando...';
 
+      if (passengerSubscription) {
+        supabaseClient.removeChannel(passengerSubscription);
+        passengerSubscription = null;
+      }
+
       try {
         const { data, error } = await supabaseClient.from('corridas').insert([{
           origem_endereco: `${currentUser.name} (${currentUser.phone})`,
@@ -410,20 +419,26 @@
         if (error) throw new Error(error.message);
 
         activeRideId = data[0].id;
+        
+        // Esconde imediatamente a caixa com o botão "Enviando..."
         document.getElementById('ride-details').style.display = 'none';
         document.getElementById('status-box').style.display = 'block';
         document.getElementById('status-box').innerText = '⏳ Aguardando motorista aceitar...';
 
+        escutarAtualizacoesPassageiro();
+
       } catch (err) {
         alert('Erro ao chamar moto: ' + err.message);
+        document.getElementById('ride-details').style.display = 'block';
+      } finally {
         btn.disabled = false;
         btn.innerText = 'Chamar Moto';
       }
     }
 
     function escutarAtualizacoesPassageiro() {
-      supabaseClient
-        .channel('schema-db-changes')
+      passengerSubscription = supabaseClient
+        .channel(`ride-status-${activeRideId}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'corridas' }, (payload) => {
           if (payload.new.id === activeRideId) {
             if (payload.new.status === 'aceita') {
@@ -436,9 +451,8 @@
                 if (pRouteLine) passengerMap.removeLayer(pRouteLine);
                 document.getElementById('status-box').style.display = 'none';
                 document.getElementById('instruction-text').style.display = 'block';
-                const btn = document.getElementById('btn-request');
-                btn.disabled = false;
-                btn.innerText = 'Chamar Moto';
+                activeRideId = null;
+                destino = null;
               }, 3000);
             }
           }
@@ -585,6 +599,7 @@
 
       } catch (err) {
         alert('Erro ao aceitar corrida: ' + err.message);
+      } finally {
         btn.disabled = false;
         btn.innerText = 'ACEITAR CORRIDA';
       }
