@@ -165,6 +165,7 @@
     let pUserMarker, pDestMarker, pRouteLine;
     let dSelfMarker, dOrigMarker, dDestMarker, dRouteLine;
     let driverMarkers = {}; 
+    let passengerMarkers = {}; // Marcadores dos clientes no mapa do motorista
 
     let origem = [-21.5431, -43.0108]; 
     let destino = null;
@@ -176,6 +177,12 @@
 
     const greenIcon = L.icon({
       iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41]
+    });
+
+    const blueIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
       iconSize: [25, 41],
       iconAnchor: [12, 41]
     });
@@ -255,7 +262,7 @@
 
       if (currentRole === 'passageiro') {
         formCache.passageiro = { name, phone };
-        await supabaseClient.from('passageiros').upsert([{ nome: name, telefone: phone }], { onConflict: 'telefone' });
+        await supabaseClient.from('passageiros').upsert([{ nome: name, telefone: phone, lat: origem[0], lng: origem[1] }], { onConflict: 'telefone' });
       } else {
         formCache.motorista = { name, plate };
         await supabaseClient.from('motoristas').upsert([{ nome: name, placa: plate }], { onConflict: 'placa' });
@@ -273,6 +280,7 @@
         document.getElementById('driver-screen').classList.add('active');
         initDriverMapBase();
         salvarEAtivarGPSMotorista();
+        carregarEExibirPassageirosNoMapaMotorista();
         escutarCorridasMotorista();
       }
     }
@@ -309,17 +317,23 @@
       pUserMarker = L.marker(origem, { icon: greenIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
 
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
           origem = [pos.coords.latitude, pos.coords.longitude];
           pUserMarker.setLatLng(origem);
           passengerMap.setView(origem, 17);
+
+          // Atualiza a posição inicial do passageiro no banco
+          await supabaseClient.from('passageiros').upsert([{ nome: currentUser.name, telefone: currentUser.phone, lat: origem[0], lng: origem[1] }], { onConflict: 'telefone' });
         }, (err) => {
           console.warn('GPS não capturado:', err.message);
         }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
 
-        navigator.geolocation.watchPosition((pos) => {
+        navigator.geolocation.watchPosition(async (pos) => {
           origem = [pos.coords.latitude, pos.coords.longitude];
           pUserMarker.setLatLng(origem);
+
+          // Atualiza continuamente no Supabase para o motorista ver em tempo real
+          await supabaseClient.from('passageiros').upsert([{ nome: currentUser.name, telefone: currentUser.phone, lat: origem[0], lng: origem[1] }], { onConflict: 'telefone' });
         }, null, { enableHighAccuracy: true });
       }
 
@@ -420,7 +434,6 @@
 
         activeRideId = data[0].id;
         
-        // Esconde imediatamente a caixa com o botão "Enviando..."
         document.getElementById('ride-details').style.display = 'none';
         document.getElementById('status-box').style.display = 'block';
         document.getElementById('status-box').innerText = '⏳ Aguardando motorista aceitar...';
@@ -473,6 +486,35 @@
       } else {
         driverMap.invalidateSize();
       }
+    }
+
+    // Exibir passageiros online no mapa do motorista
+    async function carregarEExibirPassageirosNoMapaMotorista() {
+      async function atualizarPassageiros() {
+        const { data, error } = await supabaseClient.from('passageiros').select('*');
+        if (!error && data) {
+          data.forEach(p => {
+            if (p.lat && p.lng) {
+              if (passengerMarkers[p.telefone]) {
+                passengerMarkers[p.telefone].setLatLng([p.lat, p.lng]);
+              } else {
+                passengerMarkers[p.telefone] = L.marker([p.lat, p.lng], { icon: blueIcon })
+                  .addTo(driverMap)
+                  .bindPopup(`👤 <b>Passageiro Online:</b> ${p.nome}`);
+              }
+            }
+          });
+        }
+      }
+
+      atualizarPassageiros();
+
+      supabaseClient
+        .channel('mudancas-passageiros')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'passageiros' }, () => {
+          atualizarPassageiros();
+        })
+        .subscribe();
     }
 
     async function salvarEAtivarGPSMotorista() {
