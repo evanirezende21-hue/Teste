@@ -47,18 +47,6 @@
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
 
     .empty-msg { text-align: center; color: #888; margin-top: 40px; }
-
-    /* Ícone customizado de Moto */
-    .moto-marker-icon {
-      background: #000;
-      border: 2px solid #ffc107;
-      border-radius: 50%;
-      color: #ffc107;
-      text-align: center;
-      line-height: 30px;
-      font-size: 16px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    }
   </style>
 </head>
 <body>
@@ -150,7 +138,7 @@
     <div class="bottom-card" id="driver-active-card" style="display: none;">
       <div style="color: #27ae60; font-weight: bold; margin-bottom: 6px;">✅ Corrida Aceita - Em Andamento</div>
       <div class="info-text" id="driver-active-passenger-info"><b>Passageiro:</b> --</div>
-      <button class="btn-primary" onclick="finalizarCorrida()">CONCLUIR CORRIDA</button>
+      <button class="btn-primary" id="btn-finish-ride" onclick="finalizarCorrida()">CONCLUIR CORRIDA</button>
     </div>
   </div>
 
@@ -199,10 +187,8 @@
       iconAnchor: [12, 41]
     });
 
-    // Ícone de Moto Seguro e sem dependências externas
-    const motoHtmlIcon = L.divIcon({
-      className: 'moto-marker-icon',
-      html: '🏍️',
+    const motoIcon = L.icon({
+      iconUrl: 'https://cdn-icons-png.flaticon.com/512/171/171238.png',
       iconSize: [32, 32],
       iconAnchor: [16, 16]
     });
@@ -210,13 +196,19 @@
     window.onload = async () => {
       try {
         const { data: mData } = await supabaseClient.from('motoristas').select('*').order('atualizado_em', { ascending: false }).limit(1);
-        if (mData && mData.length > 0) formCache.motorista = { name: mData[0].nome, plate: mData[0].placa };
+        if (mData && mData.length > 0) {
+          formCache.motorista = { name: mData[0].nome, plate: mData[0].placa };
+        }
 
         const { data: pData } = await supabaseClient.from('passageiros').select('*').order('criado_em', { ascending: false }).limit(1);
-        if (pData && pData.length > 0) formCache.passageiro = { name: pData[0].nome, phone: pData[0].telefone };
+        if (pData && pData.length > 0) {
+          formCache.passageiro = { name: pData[0].nome, phone: pData[0].telefone };
+        }
 
         setRole('passageiro');
-      } catch (e) { console.log('Modo inicial'); }
+      } catch (e) {
+        console.log('Modo inicial');
+      }
     };
 
     function setRole(newRole) {
@@ -249,9 +241,20 @@
       const phone = document.getElementById('user-phone').value.trim();
       const plate = document.getElementById('user-plate').value.trim();
 
-      if (!name) return alert('Por favor, informe o seu nome.');
-      if (currentRole === 'passageiro' && !phone) return alert('Por favor, informe o telemóvel.');
-      if (currentRole === 'motorista' && !plate) return alert('Por favor, informe a placa.');
+      if (!name) {
+        alert('Por favor, informe o seu nome.');
+        return;
+      }
+
+      if (currentRole === 'passageiro' && !phone) {
+        alert('Por favor, informe o seu telemóvel / WhatsApp.');
+        return;
+      }
+
+      if (currentRole === 'motorista' && !plate) {
+        alert('Por favor, informe a placa da moto.');
+        return;
+      }
 
       currentUser = { name, phone, plate, role: currentRole };
 
@@ -284,11 +287,15 @@
       if (dOrigMarker) driverMap.removeLayer(dOrigMarker);
       if (dDestMarker) driverMap.removeLayer(dDestMarker);
       if (dRouteLine) driverMap.removeLayer(dRouteLine);
-      dOrigMarker = null; dDestMarker = null; dRouteLine = null;
+      dOrigMarker = null;
+      dDestMarker = null;
+      dRouteLine = null;
     }
 
     function sairDaConta() {
-      currentUser = null; activeRideId = null; pendingRide = null;
+      currentUser = null;
+      activeRideId = null;
+      pendingRide = null;
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById('auth-screen').classList.add('active');
     }
@@ -298,7 +305,11 @@
       if (passengerMap) return;
 
       passengerMap = L.map('passenger-map').setView(origem, 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(passengerMap);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap France',
+        maxZoom: 20
+      }).addTo(passengerMap);
 
       pUserMarker = L.marker(origem, { icon: greenIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
 
@@ -307,7 +318,9 @@
           origem = [pos.coords.latitude, pos.coords.longitude];
           pUserMarker.setLatLng(origem);
           passengerMap.setView(origem, passengerMap.getZoom());
-        }, null, { enableHighAccuracy: true });
+        }, (err) => {
+          console.warn('GPS não capturado:', err.message);
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
       }
 
       passengerMap.on('click', onPassengerMapClick);
@@ -316,8 +329,11 @@
     async function onPassengerMapClick(e) {
       destino = [e.latlng.lat, e.latlng.lng];
 
-      if (pDestMarker) pDestMarker.setLatLng(destino);
-      else pDestMarker = L.marker(destino, { icon: redIcon }).addTo(passengerMap);
+      if (pDestMarker) {
+        pDestMarker.setLatLng(destino);
+      } else {
+        pDestMarker = L.marker(destino, { icon: redIcon }).addTo(passengerMap);
+      }
 
       const url = `https://router.project-osrm.org/route/v1/driving/${origem[1]},${origem[0]};${destino[1]},${destino[0]}?overview=full&geometries=geojson`;
 
@@ -340,7 +356,9 @@
           pRouteLine = L.polyline(coordinates, { color: '#007bff', weight: 5 }).addTo(passengerMap);
           passengerMap.fitBounds(pRouteLine.getBounds(), { padding: [50, 50] });
         }
-      } catch (err) { alert('Erro ao calcular rota'); }
+      } catch (err) {
+        alert('Erro ao calcular rota: ' + err.message);
+      }
     }
 
     async function carregarEExibirMotoristasNoMapa() {
@@ -352,7 +370,7 @@
               if (driverMarkers[m.placa]) {
                 driverMarkers[m.placa].setLatLng([m.lat, m.lng]);
               } else {
-                driverMarkers[m.placa] = L.marker([m.lat, m.lng], { icon: motoHtmlIcon })
+                driverMarkers[m.placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                   .addTo(passengerMap)
                   .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`);
               }
@@ -365,13 +383,16 @@
 
       supabaseClient
         .channel('mudancas-motoristas')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'motoristas' }, () => { atualizarMotos(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'motoristas' }, () => {
+          atualizarMotos();
+        })
         .subscribe();
     }
 
     async function solicitarCorrida() {
       const btn = document.getElementById('btn-request');
-      btn.disabled = true; btn.innerText = 'Enviando...';
+      btn.disabled = true;
+      btn.innerText = 'Enviando...';
 
       const { data, error } = await supabaseClient.from('corridas').insert([{
         origem_endereco: `${currentUser.name} (${currentUser.phone})`,
@@ -386,7 +407,8 @@
 
       if (error) {
         alert('Erro ao chamar moto: ' + error.message);
-        btn.disabled = false; btn.innerText = 'Chamar Moto';
+        btn.disabled = false;
+        btn.innerText = 'Chamar Moto';
       } else {
         activeRideId = data[0].id;
         document.getElementById('ride-details').style.display = 'none';
@@ -421,8 +443,12 @@
     function initDriverMapBase() {
       if (!driverMap) {
         driverMap = L.map('driver-map').setView(origem, 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(driverMap);
-        dSelfMarker = L.marker(origem, { icon: motoHtmlIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`);
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap France',
+          maxZoom: 20
+        }).addTo(driverMap);
+
+        dSelfMarker = L.marker(origem, { icon: motoIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`);
       } else {
         driverMap.invalidateSize();
       }
@@ -446,7 +472,19 @@
               lng: lng,
               atualizado_em: new Date().toISOString()
             }], { onConflict: 'placa' });
-        }, null, { enableHighAccuracy: true });
+        }, async () => {
+          const latInicial = origem[0] + (Math.random() - 0.5) * 0.005; 
+          const lngInicial = origem[1] + (Math.random() - 0.5) * 0.005;
+          await supabaseClient
+            .from('motoristas')
+            .upsert([{
+              nome: currentUser.name,
+              placa: currentUser.plate,
+              lat: latInicial,
+              lng: lngInicial,
+              atualizado_em: new Date().toISOString()
+            }], { onConflict: 'placa' });
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
       }
     }
 
@@ -483,9 +521,8 @@
 
       buscarSolicitacoes();
 
-      // Escuta em tempo real para novos chamados
       supabaseClient
-        .channel('corridas-stream-driver-live')
+        .channel('corridas-stream-driver')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'corridas' }, () => {
           buscarSolicitacoes();
         })
@@ -494,6 +531,7 @@
 
     function exibirSolicitacaoNoMapaMotorista(pOrigem, pDestino) {
       if (!driverMap) initDriverMapBase();
+
       limparRotaMapaMotorista();
 
       dOrigMarker = L.marker(pOrigem, { icon: greenIcon }).addTo(driverMap).bindPopup("Buscar Passageiro").openPopup();
@@ -516,45 +554,63 @@
       if (!pendingRide) return;
 
       const btn = document.getElementById('btn-accept-ride');
-      btn.disabled = true; btn.innerText = 'Aceitando...';
+      btn.disabled = true;
+      btn.innerText = 'Aceitando...';
 
-      const { error } = await supabaseClient
-        .from('corridas')
-        .update({ 
-          status: 'aceita',
-          destino_endereco: `Aceita por ${currentUser.name} (Placa: ${currentUser.plate})`
-        })
-        .eq('id', pendingRide.id);
+      try {
+        const { data, error } = await supabaseClient
+          .from('corridas')
+          .update({ 
+            status: 'aceita',
+            destino_endereco: `Aceita por ${currentUser.name} (Placa: ${currentUser.plate})`
+          })
+          .eq('id', pendingRide.id)
+          .select();
 
-      if (error) {
-        alert('Erro ao aceitar corrida: ' + error.message);
-        btn.disabled = false; btn.innerText = 'ACEITAR CORRIDA';
-      } else {
+        if (error) {
+          throw new Error(error.message);
+        }
+
         activeRideId = pendingRide.id;
         document.getElementById('driver-request-card').style.display = 'none';
         document.getElementById('driver-active-card').style.display = 'block';
         document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
         if (dRouteLine) dRouteLine.setStyle({ color: '#27ae60' });
+
+      } catch (err) {
+        alert('Erro ao aceitar corrida: ' + err.message);
+        btn.disabled = false;
+        btn.innerText = 'ACEITAR CORRIDA';
       }
     }
 
     async function finalizarCorrida() {
       if (!activeRideId) return;
 
-      const { error } = await supabaseClient
-        .from('corridas')
-        .update({ status: 'concluida' })
-        .eq('id', activeRideId);
+      const btn = document.getElementById('btn-finish-ride');
+      btn.disabled = true;
+      btn.innerText = 'Concluindo...';
 
-      if (error) {
-        alert('Erro ao concluir corrida: ' + error.message);
-      } else {
+      try {
+        const { error } = await supabaseClient
+          .from('corridas')
+          .update({ status: 'concluida' })
+          .eq('id', activeRideId);
+
+        if (error) throw new Error(error.message);
+
         alert('Corrida concluída com sucesso!');
-        activeRideId = null; pendingRide = null;
+        activeRideId = null;
+        pendingRide = null;
         limparRotaMapaMotorista();
         document.getElementById('driver-active-card').style.display = 'none';
         document.getElementById('driver-empty-box').style.display = 'block';
+      } catch (err) {
+        alert('Erro ao concluir corrida: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'CONCLUIR CORRIDA';
       }
     }
   </script>
