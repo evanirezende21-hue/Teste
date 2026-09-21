@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -390,30 +389,40 @@
     }
 
     async function solicitarCorrida() {
+      if (!destino) {
+        alert('Por favor, toque no mapa para definir o ponto de destino.');
+        return;
+      }
+
       const btn = document.getElementById('btn-request');
       btn.disabled = true;
       btn.innerText = 'Enviando...';
 
-      const { data, error } = await supabaseClient.from('corridas').insert([{
-        origem_endereco: `${currentUser.name} (${currentUser.phone})`,
-        origem_lat: origem[0],
-        origem_lng: origem[1],
-        destino_endereco: 'Destino no Mapa',
-        destino_lat: destino[0],
-        destino_lng: destino[1],
-        valor: parseFloat(valorEstimado.toFixed(2)),
-        status: 'solicitada'
-      }]).select();
+      try {
+        const { data, error } = await supabaseClient.from('corridas').insert([{
+          origem_endereco: `${currentUser.name} (${currentUser.phone})`,
+          origem_lat: origem[0],
+          origem_lng: origem[1],
+          destino_endereco: 'Destino Selecionado no Mapa',
+          destino_lat: destino[0],
+          destino_lng: destino[1],
+          valor: parseFloat(valorEstimado.toFixed(2)),
+          status: 'solicitada'
+        }]).select();
 
-      if (error) {
-        alert('Erro ao chamar moto: ' + error.message);
-        btn.disabled = false;
-        btn.innerText = 'Chamar Moto';
-      } else {
+        if (error) {
+          throw new Error(error.message);
+        }
+
         activeRideId = data[0].id;
         document.getElementById('ride-details').style.display = 'none';
         document.getElementById('status-box').style.display = 'block';
         document.getElementById('status-box').innerText = '⏳ Aguardando motorista aceitar...';
+
+      } catch (err) {
+        alert('Erro ao chamar moto: ' + err.message);
+        btn.disabled = false;
+        btn.innerText = 'Chamar Moto';
       }
     }
 
@@ -432,6 +441,9 @@
                 if (pRouteLine) passengerMap.removeLayer(pRouteLine);
                 document.getElementById('status-box').style.display = 'none';
                 document.getElementById('instruction-text').style.display = 'block';
+                const btn = document.getElementById('btn-request');
+                btn.disabled = false;
+                btn.innerText = 'Chamar Moto';
               }, 3000);
             }
           }
