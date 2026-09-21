@@ -195,7 +195,6 @@
         document.getElementById('passenger-badge').innerText = `${name} (${phone})`;
         document.getElementById('passenger-screen').classList.add('active');
         
-        // Timeout para garantir que a div esteja visível antes de carregar o mapa
         setTimeout(() => {
           initPassengerMap();
           carregarEExibirMotoristasNoMapa();
@@ -282,6 +281,15 @@
       async function buscarEPintarPassageiros() {
         const { data, error } = await supabaseClient.from('passageiros').select('*');
         if (!error && data && driverMap) {
+          // Limpa marcadores de passageiros que não existem mais no banco
+          const telefonesAtuais = data.map(p => p.telefone);
+          Object.keys(passengerMarkers).forEach(tel => {
+            if (!telefonesAtuais.includes(tel)) {
+              driverMap.removeLayer(passengerMarkers[tel]);
+              delete passengerMarkers[tel];
+            }
+          });
+
           data.forEach(p => {
             if (p.lat && p.lng) {
               if (passengerMarkers[p.telefone]) {
@@ -344,25 +352,38 @@
 
     async function onPassengerMapClick(e) {
       destino = [e.latlng.lat, e.latlng.lng];
-      if (pDestMarker) pDestMarker.setLatLng(destino);
-      else pDestMarker = L.marker(destino, { icon: redIcon }).addTo(passengerMap);
 
-      const url = `https://router.project-osrm.org/route/v1/driving/${origem[1]},${origem[0]};${destino[1]},${destino[0]}?overview=full&geometries=geojson`;
-      const res = await fetch(url);
-      const data = await res.json();
+      if (pDestMarker) {
+        pDestMarker.setLatLng(destino);
+      } else {
+        pDestMarker = L.marker(destino, { icon: redIcon }).addTo(passengerMap);
+      }
 
-      if (data.routes && data.routes.length > 0) {
-        distanciaKm = data.routes[0].distance / 1000;
-        valorEstimado = TAXA_MINIMA + (distanciaKm * PRECO_POR_KM);
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${origem[1]},${origem[0]};${destino[1]},${destino[0]}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        const data = await res.json();
 
-        document.getElementById('instruction-text').style.display = 'none';
-        document.getElementById('ride-details').style.display = 'block';
-        document.getElementById('distance-text').innerText = `Distância: ${distanciaKm.toFixed(2)} km`;
-        document.getElementById('price-text').innerText = `R$ ${valorEstimado.toFixed(2)}`;
+        if (data.routes && data.routes.length > 0) {
+          distanciaKm = data.routes[0].distance / 1000;
+          valorEstimado = TAXA_MINIMA + (distanciaKm * PRECO_POR_KM);
 
-        const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-        if (pRouteLine) passengerMap.removeLayer(pRouteLine);
-        pRouteLine = L.polyline(coordinates, { color: '#007bff', weight: 5 }).addTo(passengerMap);
+          document.getElementById('instruction-text').style.display = 'none';
+          document.getElementById('ride-details').style.display = 'block';
+          document.getElementById('distance-text').innerText = `Distância: ${distanciaKm.toFixed(2)} km`;
+          document.getElementById('price-text').innerText = `R$ ${valorEstimado.toFixed(2)}`;
+
+          const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          
+          if (pRouteLine) {
+            passengerMap.removeLayer(pRouteLine);
+          }
+          
+          pRouteLine = L.polyline(coordinates, { color: '#007bff', weight: 5 }).addTo(passengerMap);
+          passengerMap.fitBounds(pRouteLine.getBounds(), { padding: [40, 40] });
+        }
+      } catch (error) {
+        console.error("Erro ao traçar rota:", error);
       }
     }
 
@@ -481,9 +502,23 @@
       document.getElementById('driver-empty-box').style.display = 'block';
     }
 
-    function sairDaConta() {
+    async function removerUsuarioDoBanco() {
+      if (!currentUser) return;
+      if (currentUser.role === 'passageiro' && currentUser.phone) {
+        await supabaseClient.from('passageiros').delete().eq('telefone', currentUser.phone);
+      } else if (currentUser.role === 'motorista' && currentUser.plate) {
+        await supabaseClient.from('motoristas').delete().eq('placa', currentUser.plate);
+      }
+    }
+
+    async function sairDaConta() {
+      await removerUsuarioDoBanco();
       location.reload();
     }
+
+    window.addEventListener('beforeunload', () => {
+      removerUsuarioDoBanco();
+    });
   </script>
 </body>
 </html>
