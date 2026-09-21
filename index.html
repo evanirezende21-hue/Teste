@@ -195,7 +195,7 @@
         document.getElementById('passenger-badge').innerText = `${name} (${phone})`;
         document.getElementById('passenger-screen').classList.add('active');
         initPassengerMap();
-        carregarEExibirMotoristasNoMapa(); // <--- ATIVA A VISUALIZAÇÃO DE MOTORISTAS
+        carregarEExibirMotoristasNoMapa();
       } else {
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
@@ -238,7 +238,6 @@
       passengerMap.on('click', onPassengerMapClick);
     }
 
-    // BUSCA E EXIBE TODAS AS MOTOS ONLINE NO MAPA DO CLIENTE
     async function carregarEExibirMotoristasNoMapa() {
       async function atualizarMotos() {
         const { data, error } = await supabaseClient.from('motoristas').select('*');
@@ -259,7 +258,6 @@
 
       atualizarMotos();
 
-      // Escuta movimentações de motoristas em tempo real
       supabaseClient
         .channel('motos-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'motoristas' }, () => atualizarMotos())
@@ -308,7 +306,13 @@
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition(async (pos) => {
           driverPos = [pos.coords.latitude, pos.coords.longitude];
-          if (dSelfMarker) dSelfMarker.setLatLng(driverPos);
+          
+          // Reutiliza o marcador existente para não duplicar
+          if (dSelfMarker) {
+            dSelfMarker.setLatLng(driverPos);
+          } else if (driverMap) {
+            dSelfMarker = L.marker(driverPos, { icon: motoIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`);
+          }
 
           if (pendingRide) {
             exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
@@ -395,14 +399,10 @@
     }
 
     function limparRotasMapaMotorista() {
-      if (dOrigMarker) driverMap.removeLayer(dOrigMarker);
-      if (dDestMarker) driverMap.removeLayer(dDestMarker);
-      if (dPickupRouteLine) driverMap.removeLayer(dPickupRouteLine);
-      if (dTripRouteLine) driverMap.removeLayer(dTripRouteLine);
-      dOrigMarker = null;
-      dDestMarker = null;
-      dPickupRouteLine = null;
-      dTripRouteLine = null;
+      if (dOrigMarker) { driverMap.removeLayer(dOrigMarker); dOrigMarker = null; }
+      if (dDestMarker) { driverMap.removeLayer(dDestMarker); dDestMarker = null; }
+      if (dPickupRouteLine) { driverMap.removeLayer(dPickupRouteLine); dPickupRouteLine = null; }
+      if (dTripRouteLine) { driverMap.removeLayer(dTripRouteLine); dTripRouteLine = null; }
     }
 
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
@@ -445,13 +445,31 @@
       activeRideId = pendingRide.id;
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
+      document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
     }
 
     async function finalizarCorrida() {
       if (!activeRideId) return;
       await supabaseClient.from('corridas').update({ status: 'concluida' }).eq('id', activeRideId);
-      alert('Corrida concluída!');
-      location.reload();
+      
+      alert('Corrida concluída com sucesso!');
+
+      // Reseta as variáveis de corrida sem sair do perfil de motorista
+      activeRideId = null;
+      pendingRide = null;
+
+      // Limpa as rotas da corrida do mapa do motorista
+      limparRotasMapaMotorista();
+
+      // Recentraliza no mapa do motorista
+      if (driverMap && driverPos) {
+        driverMap.setView(driverPos, 16);
+      }
+
+      // Restaura a interface do painel do motorista para aguardando corridas
+      document.getElementById('driver-active-card').style.display = 'none';
+      document.getElementById('driver-request-card').style.display = 'none';
+      document.getElementById('driver-empty-box').style.display = 'block';
     }
 
     function sairDaConta() {
