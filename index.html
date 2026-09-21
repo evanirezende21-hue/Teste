@@ -212,7 +212,8 @@
         nome: currentUser.name, 
         telefone: currentUser.phone, 
         lat: lat, 
-        lng: lng 
+        lng: lng,
+        atualizado_em: new Date().toISOString()
       }], { onConflict: 'telefone' });
     }
 
@@ -268,8 +269,16 @@
       async function buscarEPintarPassageiros() {
         const { data, error } = await supabaseClient.from('passageiros').select('*');
         if (!error && data) {
+          const agora = new Date().getTime();
+          const passageirosAtivos = new Set();
+
           data.forEach(p => {
-            if (p.lat && p.lng) {
+            // Filtra passageiros ativos nos últimos 2 minutos
+            const ultimaAtualizacao = p.atualizado_em ? new Date(p.atualizado_em).getTime() : 0;
+            const diffMinutos = (agora - ultimaAtualizacao) / (1000 * 60);
+
+            if (p.lat && p.lng && diffMinutos <= 2) {
+              passageirosAtivos.add(p.telefone);
               if (passengerMarkers[p.telefone]) {
                 passengerMarkers[p.telefone].setLatLng([p.lat, p.lng]);
               } else {
@@ -277,6 +286,14 @@
                   .addTo(driverMap)
                   .bindPopup(`👤 <b>Passageiro Conectado:</b><br>${p.nome}<br>📞 ${p.telefone}`);
               }
+            }
+          });
+
+          // Remove do mapa os passageiros que ficaram inativos
+          Object.keys(passengerMarkers).forEach(tel => {
+            if (!passageirosAtivos.has(tel)) {
+              driverMap.removeLayer(passengerMarkers[tel]);
+              delete passengerMarkers[tel];
             }
           });
         }
@@ -307,7 +324,6 @@
         navigator.geolocation.watchPosition(async (pos) => {
           driverPos = [pos.coords.latitude, pos.coords.longitude];
           
-          // Reutiliza o marcador existente para não duplicar
           if (dSelfMarker) {
             dSelfMarker.setLatLng(driverPos);
           } else if (driverMap) {
@@ -454,19 +470,15 @@
       
       alert('Corrida concluída com sucesso!');
 
-      // Reseta as variáveis de corrida sem sair do perfil de motorista
       activeRideId = null;
       pendingRide = null;
 
-      // Limpa as rotas da corrida do mapa do motorista
       limparRotasMapaMotorista();
 
-      // Recentraliza no mapa do motorista
       if (driverMap && driverPos) {
         driverMap.setView(driverPos, 16);
       }
 
-      // Restaura a interface do painel do motorista para aguardando corridas
       document.getElementById('driver-active-card').style.display = 'none';
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-empty-box').style.display = 'block';
