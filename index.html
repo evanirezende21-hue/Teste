@@ -45,12 +45,6 @@
     /* Botões */
     .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-    
-    .btn-google { width: 100%; background: #fff; color: #333; border: 1px solid #ccc; padding: 12px; border-radius: 12px; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 16px; }
-
-    .divider { display: flex; align-items: center; text-align: center; color: #777; margin: 15px 0; font-size: 12px; }
-    .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #444; }
-    .divider span { padding: 0 10px; }
   </style>
 </head>
 <body>
@@ -65,14 +59,6 @@
         <button class="tab-btn" id="tab-driver" onclick="setRole('motorista')">Motorista</button>
       </div>
 
-      <!-- Botão de Login Social / Google -->
-      <button class="btn-google" onclick="loginComGoogle()">
-        <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" width="18" height="18" alt="Google">
-        Entrar com o Google
-      </button>
-
-      <div class="divider"><span>ou preencha manualmente</span></div>
-
       <div id="form-container">
         <div class="form-group">
           <label>Seu Nome Completo</label>
@@ -86,7 +72,7 @@
 
         <div class="form-group" id="group-plate" style="display: none;">
           <label>Placa da Moto</label>
-          <input type="text" id="user-plate" placeholder="Ex: ABC-1234" />
+          <input type="text" id="user-plate" placeholder="Ex: PUH1179" />
         </div>
 
         <button class="btn-primary" id="btn-login" onclick="entrarNoApp()">ENTRAR NO APP</button>
@@ -171,7 +157,7 @@
 
     let formCache = {
       passageiro: { name: '', phone: '' },
-      motorista: { name: '', plate: '' }
+      motorista: { name: 'Evanir', plate: 'PUH1179' }
     };
 
     let passengerMap, driverMap;
@@ -205,30 +191,8 @@
       iconAnchor: [16, 16]
     });
 
-    // Função para Login Social no Google via Supabase
-    async function loginComGoogle() {
-      const { error } = await supabaseClient.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.href
-        }
-      });
-      if (error) alert('Erro no login do Google: ' + error.message);
-    }
-
-    // Verificar se o usuário já se autenticou via Google ao carregar a página
     window.onload = async () => {
-      const { data: { user } } = await supabaseClient.auth.getUser();
-
-      if (user) {
-        const nomeGoogle = user.user_metadata.full_name || user.email;
-        document.getElementById('user-name').value = nomeGoogle;
-      }
-
       try {
-        const { data: mData } = await supabaseClient.from('motoristas').select('*').order('atualizado_em', { ascending: false }).limit(1);
-        if (mData && mData.length > 0) formCache.motorista = { name: mData[0].nome, plate: mData[0].placa };
-
         const { data: pData } = await supabaseClient.from('passageiros').select('*').order('criado_em', { ascending: false }).limit(1);
         if (pData && pData.length > 0) formCache.passageiro = { name: pData[0].nome, phone: pData[0].telefone };
 
@@ -258,8 +222,8 @@
         document.getElementById('user-name').value = formCache.passageiro.name || '';
         document.getElementById('user-phone').value = formCache.passageiro.phone || '';
       } else {
-        document.getElementById('user-name').value = formCache.motorista.name || '';
-        document.getElementById('user-plate').value = formCache.motorista.plate || '';
+        document.getElementById('user-name').value = formCache.motorista.name || 'Evanir';
+        document.getElementById('user-plate').value = formCache.motorista.plate || 'PUH1179';
       }
     }
 
@@ -323,7 +287,6 @@
       currentUser = null;
       activeRideId = null;
       pendingRide = null;
-      supabaseClient.auth.signOut();
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById('auth-screen').classList.add('active');
     }
