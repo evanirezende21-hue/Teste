@@ -194,15 +194,23 @@
       if (currentRole === 'passageiro') {
         document.getElementById('passenger-badge').innerText = `${name} (${phone})`;
         document.getElementById('passenger-screen').classList.add('active');
-        initPassengerMap();
-        carregarEExibirMotoristasNoMapa();
+        
+        // Timeout para garantir que a div esteja visível antes de carregar o mapa
+        setTimeout(() => {
+          initPassengerMap();
+          carregarEExibirMotoristasNoMapa();
+        }, 100);
+
       } else {
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
-        initDriverMapBase();
-        salvarEAtivarGPSMotorista();
-        carregarEExibirPassageirosNoMapaMotorista();
-        escutarCorridasMotorista();
+        
+        setTimeout(() => {
+          initDriverMapBase();
+          salvarEAtivarGPSMotorista();
+          carregarEExibirPassageirosNoMapaMotorista();
+          escutarCorridasMotorista();
+        }, 100);
       }
     }
 
@@ -212,37 +220,42 @@
         nome: currentUser.name, 
         telefone: currentUser.phone, 
         lat: lat, 
-        lng: lng,
-        atualizado_em: new Date().toISOString()
+        lng: lng 
       }], { onConflict: 'telefone' });
     }
 
     function initPassengerMap() {
-      if (passengerMap) return;
-
-      passengerMap = L.map('passenger-map').setView(origem, 16);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(passengerMap);
-      pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
+      if (!passengerMap) {
+        passengerMap = L.map('passenger-map').setView(origem, 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(passengerMap);
+        pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
+      } else {
+        passengerMap.invalidateSize();
+        passengerMap.setView(origem, 16);
+      }
 
       atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
 
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
           origem = [pos.coords.latitude, pos.coords.longitude];
-          pUserMarker.setLatLng(origem);
-          passengerMap.setView(origem, 16);
+          if (pUserMarker) {
+            pUserMarker.setLatLng(origem);
+          } else if (passengerMap) {
+            pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
+          }
           atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
         }, null, { enableHighAccuracy: true });
       }
 
+      passengerMap.off('click');
       passengerMap.on('click', onPassengerMapClick);
     }
 
     async function carregarEExibirMotoristasNoMapa() {
       async function atualizarMotos() {
         const { data, error } = await supabaseClient.from('motoristas').select('*');
-        if (!error && data) {
+        if (!error && data && passengerMap) {
           data.forEach(m => {
             if (m.lat && m.lng) {
               if (driverMarkers[m.placa]) {
@@ -268,17 +281,9 @@
     async function carregarEExibirPassageirosNoMapaMotorista() {
       async function buscarEPintarPassageiros() {
         const { data, error } = await supabaseClient.from('passageiros').select('*');
-        if (!error && data) {
-          const agora = new Date().getTime();
-          const passageirosAtivos = new Set();
-
+        if (!error && data && driverMap) {
           data.forEach(p => {
-            // Filtra passageiros ativos nos últimos 2 minutos
-            const ultimaAtualizacao = p.atualizado_em ? new Date(p.atualizado_em).getTime() : 0;
-            const diffMinutos = (agora - ultimaAtualizacao) / (1000 * 60);
-
-            if (p.lat && p.lng && diffMinutos <= 2) {
-              passageirosAtivos.add(p.telefone);
+            if (p.lat && p.lng) {
               if (passengerMarkers[p.telefone]) {
                 passengerMarkers[p.telefone].setLatLng([p.lat, p.lng]);
               } else {
@@ -286,14 +291,6 @@
                   .addTo(driverMap)
                   .bindPopup(`👤 <b>Passageiro Conectado:</b><br>${p.nome}<br>📞 ${p.telefone}`);
               }
-            }
-          });
-
-          // Remove do mapa os passageiros que ficaram inativos
-          Object.keys(passengerMarkers).forEach(tel => {
-            if (!passageirosAtivos.has(tel)) {
-              driverMap.removeLayer(passengerMarkers[tel]);
-              delete passengerMarkers[tel];
             }
           });
         }
