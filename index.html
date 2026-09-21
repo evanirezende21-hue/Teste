@@ -279,10 +279,11 @@
 
     async function carregarEExibirPassageirosNoMapaMotorista() {
       async function buscarEPintarPassageiros() {
-        const { data, error } = await supabaseClient.from('passageiros').select('*');
-        if (!error && data && driverMap) {
-          // Limpa marcadores de passageiros que não existem mais no banco
-          const telefonesAtuais = data.map(p => p.telefone);
+        const { data, error } = await supabaseClient.from('motoristas').select('*');
+        const { data: passData, error: passError } = await supabaseClient.from('passageiros').select('*');
+        
+        if (!passError && passData && driverMap) {
+          const telefonesAtuais = passData.map(p => p.telefone);
           Object.keys(passengerMarkers).forEach(tel => {
             if (!telefonesAtuais.includes(tel)) {
               driverMap.removeLayer(passengerMarkers[tel]);
@@ -290,7 +291,7 @@
             }
           });
 
-          data.forEach(p => {
+          passData.forEach(p => {
             if (p.lat && p.lng) {
               if (passengerMarkers[p.telefone]) {
                 passengerMarkers[p.telefone].setLatLng([p.lat, p.lng]);
@@ -351,6 +352,8 @@
     }
 
     async function onPassengerMapClick(e) {
+      if (activeRideId) return; // Bloqueia novos cliques durante corrida ativa
+
       destino = [e.latlng.lat, e.latlng.lng];
 
       if (pDestMarker) {
@@ -404,7 +407,39 @@
         document.getElementById('ride-details').style.display = 'none';
         document.getElementById('status-box').style.display = 'block';
         document.getElementById('status-box').innerText = '⏳ Aguardando motorista aceitar...';
+
+        escutarStatusCorridaPassageiro(activeRideId);
       }
+    }
+
+    function escutarStatusCorridaPassageiro(rideId) {
+      supabaseClient
+        .channel(`corrida-passageiro-${rideId}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'corridas', filter: `id=eq.${rideId}` }, (payload) => {
+          const status = payload.new.status;
+          
+          if (status === 'aceita') {
+            document.getElementById('status-box').innerText = '✅ Motorista aceitou! Ele está a caminho.';
+            document.getElementById('status-box').style.color = '#27ae60';
+          } else if (status === 'concluida') {
+            alert('🎉 Sua corrida foi concluída com sucesso!');
+            resetarEstadoPassageiro();
+          }
+        })
+        .subscribe();
+    }
+
+    function resetarEstadoPassageiro() {
+      activeRideId = null;
+      destino = null;
+      if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
+      if (pRouteLine) { passengerMap.removeLayer(pRouteLine); pRouteLine = null; }
+      
+      document.getElementById('status-box').style.display = 'none';
+      document.getElementById('instruction-text').style.display = 'block';
+      document.getElementById('ride-details').style.display = 'none';
+
+      passengerMap.setView(origem, 16);
     }
 
     function escutarCorridasMotorista() {
@@ -477,6 +512,13 @@
       if (!pendingRide) return;
       await supabaseClient.from('corridas').update({ status: 'aceita' }).eq('id', pendingRide.id);
       activeRideId = pendingRide.id;
+      
+      // Limpa a linha pontilhada da busca inicial ao aceitar a corrida
+      if (dPickupRouteLine) {
+        driverMap.removeLayer(dPickupRouteLine);
+        dPickupRouteLine = null;
+      }
+
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
       document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
@@ -491,6 +533,7 @@
       activeRideId = null;
       pendingRide = null;
 
+      // Limpa todas as rotas e marcações do mapa do motorista
       limparRotasMapaMotorista();
 
       if (driverMap && driverPos) {
