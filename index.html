@@ -150,13 +150,13 @@
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine;
     let dSelfMarker, dOrigMarker, dDestMarker;
-    let dPickupRouteLine, dTripRouteLine; // Duas linhas de rota para o motorista
+    let dPickupRouteLine, dTripRouteLine;
     
     let driverMarkers = {}; 
     let passengerMarkers = {};
 
     let origem = [-21.5431, -43.0108]; 
-    let driverPos = [-21.5431, -43.0108]; // Posição atual do motorista
+    let driverPos = [-21.5431, -43.0108]; 
     let destino = null;
     let valorEstimado = 0;
     let distanciaKm = 0;
@@ -195,7 +195,7 @@
         document.getElementById('passenger-badge').innerText = `${name} (${phone})`;
         document.getElementById('passenger-screen').classList.add('active');
         initPassengerMap();
-        carregarEExibirMotoristasNoMapa();
+        carregarEExibirMotoristasNoMapa(); // <--- ATIVA A VISUALIZAÇÃO DE MOTORISTAS
       } else {
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
@@ -236,6 +236,34 @@
       }
 
       passengerMap.on('click', onPassengerMapClick);
+    }
+
+    // BUSCA E EXIBE TODAS AS MOTOS ONLINE NO MAPA DO CLIENTE
+    async function carregarEExibirMotoristasNoMapa() {
+      async function atualizarMotos() {
+        const { data, error } = await supabaseClient.from('motoristas').select('*');
+        if (!error && data) {
+          data.forEach(m => {
+            if (m.lat && m.lng) {
+              if (driverMarkers[m.placa]) {
+                driverMarkers[m.placa].setLatLng([m.lat, m.lng]);
+              } else {
+                driverMarkers[m.placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
+                  .addTo(passengerMap)
+                  .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`);
+              }
+            }
+          });
+        }
+      }
+
+      atualizarMotos();
+
+      // Escuta movimentações de motoristas em tempo real
+      supabaseClient
+        .channel('motos-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'motoristas' }, () => atualizarMotos())
+        .subscribe();
     }
 
     async function carregarEExibirPassageirosNoMapaMotorista() {
@@ -282,7 +310,6 @@
           driverPos = [pos.coords.latitude, pos.coords.longitude];
           if (dSelfMarker) dSelfMarker.setLatLng(driverPos);
 
-          // Se houver uma corrida ativa, podemos atualizar a rota até o passageiro
           if (pendingRide) {
             exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
           }
@@ -296,27 +323,6 @@
           }], { onConflict: 'placa' });
         }, null, { enableHighAccuracy: true });
       }
-    }
-
-    async function carregarEExibirMotoristasNoMapa() {
-      async function atualizarMotos() {
-        const { data } = await supabaseClient.from('motoristas').select('*');
-        if (data) {
-          data.forEach(m => {
-            if (m.lat && m.lng) {
-              if (driverMarkers[m.placa]) {
-                driverMarkers[m.placa].setLatLng([m.lat, m.lng]);
-              } else {
-                driverMarkers[m.placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
-                  .addTo(passengerMap)
-                  .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`);
-              }
-            }
-          });
-        }
-      }
-      atualizarMotos();
-      supabaseClient.channel('motos-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'motoristas' }, () => atualizarMotos()).subscribe();
     }
 
     async function onPassengerMapClick(e) {
@@ -399,20 +405,15 @@
       dTripRouteLine = null;
     }
 
-    // Desenha as duas rotas no mapa do motorista: Motorista ➔ Cliente e Cliente ➔ Destino
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
       if (!driverMap) initDriverMapBase();
 
       limparRotasMapaMotorista();
 
-      // Marcadores do Passageiro e do Destino
       dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Passageiro Esperando Aqui</b>");
       dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon }).addTo(driverMap).bindPopup("<b>Destino do Passageiro</b>");
 
-      // 1. Rota de Busca: Motorista -> Passageiro (Linha Laranja Trastejada)
       const urlBusca = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
-      
-      // 2. Rota do Destino: Passageiro -> Destino final (Linha Azul Contínua)
       const urlViagem = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
 
       try {
@@ -424,12 +425,12 @@
 
         if (dataBusca.routes && dataBusca.routes.length > 0) {
           const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap); // Laranja pontilhado (Buscar)
+          dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
         }
 
         if (dataViagem.routes && dataViagem.routes.length > 0) {
           const coordsViagem = dataViagem.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          dTripRouteLine = L.polyline(coordsViagem, { color: '#2980b9', weight: 6 }).addTo(driverMap); // Azul contínuo (Corrida)
+          dTripRouteLine = L.polyline(coordsViagem, { color: '#2980b9', weight: 6 }).addTo(driverMap);
         }
 
         driverMap.fitBounds(bounds, { padding: [50, 50] });
