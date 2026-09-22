@@ -282,6 +282,8 @@
         document.getElementById('passenger-badge').innerText = `${name} (${phone})`;
         document.getElementById('passenger-screen').classList.add('active');
         
+        await atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
+
         setTimeout(() => {
           initPassengerMap();
           carregarEExibirMotoristasNoMapa();
@@ -291,6 +293,14 @@
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
         
+        await supabaseClient.from('motoristas').upsert([{
+          nome: currentUser.name,
+          placa: currentUser.plate,
+          lat: driverPos[0],
+          lng: driverPos[1],
+          atualizado_em: new Date().toISOString()
+        }], { onConflict: 'placa' });
+
         setTimeout(() => {
           initDriverMapBase();
           salvarEAtivarGPSMotorista();
@@ -321,8 +331,6 @@
         passengerMap.setView(origem, 16);
       }
 
-      atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
-
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
           origem = [pos.coords.latitude, pos.coords.longitude];
@@ -332,7 +340,9 @@
             pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
           }
           atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
-        }, null, { enableHighAccuracy: true });
+        }, (err) => {
+          console.warn("Permissão de GPS pendente ou negada:", err);
+        }, { enableHighAccuracy: true });
       }
 
       passengerMap.off('click');
@@ -367,9 +377,7 @@
       }
 
       await atualizarMotos();
-
-      // Consulta contínua a cada 4 segundos para garantir atualização do mapa no celular
-      setInterval(atualizarMotos, 4000);
+      setInterval(atualizarMotos, 3000);
 
       supabaseClient
         .channel('motos-realtime')
@@ -412,8 +420,7 @@
       }
 
       await buscarEPintarPassageiros();
-
-      setInterval(buscarEPintarPassageiros, 4000);
+      setInterval(buscarEPintarPassageiros, 3000);
 
       supabaseClient
         .channel('passageiros-em-tempo-real')
@@ -461,7 +468,9 @@
             lng: driverPos[1],
             atualizado_em: new Date().toISOString()
           }], { onConflict: 'placa' });
-        }, null, { enableHighAccuracy: true });
+        }, (err) => {
+          console.warn("GPS do motorista indisponível:", err);
+        }, { enableHighAccuracy: true });
       }
     }
 
