@@ -426,18 +426,17 @@
 
       await buscarEPintarPassageiros();
 
+      // NOTIFICA O MOTORISTA SE HOUVER NOVO PASSAGEIRO CONECTADO (INSERT OU UPDATE COM ENTRADA)
       supabaseClient
         .channel('passageiros-em-tempo-real')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'passageiros' }, (payload) => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'passageiros' }, (payload) => {
           if (payload.new && payload.new.nome) {
-            exibirNotificacaoMotorista(`👤 Cliente On-line: ${payload.new.nome} abriu o app!`);
+            const tel = payload.new.telefone;
+            // Notifica apenas se for uma nova conexão e não o próprio número do motorista
+            if (!passengerMarkers[tel] && (!currentUser || currentUser.phone !== tel)) {
+              exibirNotificacaoMotorista(`👤 Cliente On-line: ${payload.new.nome} abriu o app!`);
+            }
           }
-          buscarEPintarPassageiros();
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'passageiros' }, () => {
-          buscarEPintarPassageiros();
-        })
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'passageiros' }, () => {
           buscarEPintarPassageiros();
         })
         .subscribe();
