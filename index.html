@@ -39,7 +39,6 @@
     .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
 
-    /* ESTILO DO BANNER DE NOTIFICAÇÃO DO MOTORISTA */
     .driver-notification {
       position: absolute;
       top: 70px;
@@ -135,7 +134,6 @@
       <button onclick="sairDaConta()" style="background: #ffc107; color: #000;">Sair / Trocar Perfil</button>
     </header>
 
-    <!-- BANNER DE NOTIFICAÇÃO EM TEMPO REAL -->
     <div id="driver-notification" class="driver-notification">
       <span id="driver-notification-msg">👤 Um cliente entrou no aplicativo!</span>
       <span style="cursor: pointer; margin-left: 10px;" onclick="fecharNotificacaoMotorista()">✕</span>
@@ -198,12 +196,10 @@
     const TAXA_MINIMA = 5.00;
     const PRECO_POR_KM = 2.50;
 
-    // Ícones Padrão do Leaflet
     const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const blueIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const redIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41] });
 
-    // Ícone da Moto SVG
     const motoSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23ffc107" stroke="%23000000" stroke-width="3"/><circle cx="20" cy="42" r="8" fill="%23222222"/><circle cx="44" cy="42" r="8" fill="%23222222"/><path d="M20 42 L26 26 L36 26 L42 34 L44 42" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 26 L32 18 L38 18" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round"/></svg>`;
 
     const motoIcon = L.icon({
@@ -213,15 +209,11 @@
       popupAnchor: [0, -18]
     });
 
-    // EVITA QUE A TELA DO CELULAR / NAVEGADOR APAGUE (WAKE LOCK API)
     async function ativarManterTelaAcesa() {
       if ('wakeLock' in navigator) {
         try {
           wakeLock = await navigator.wakeLock.request('screen');
-          console.log("Tela configurada para manter-se acesa.");
-        } catch (err) {
-          console.warn("Não foi possível impedir o descanso de tela:", err.message);
-        }
+        } catch (err) {}
       }
     }
 
@@ -232,24 +224,21 @@
       }
     }
 
-    // EMITE UM SINAL SONORO SUAVE AO RECEBER NOTIFICAÇÃO
     function tocarSinalNotificacao() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15);
         gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.4);
-      } catch (e) {
-        console.log("Áudio indisponível:", e);
-      }
+      } catch (e) {}
     }
 
     function exibirNotificacaoMotorista(mensagem) {
@@ -258,9 +247,7 @@
       el.style.display = 'flex';
       tocarSinalNotificacao();
 
-      setTimeout(() => {
-        fecharNotificacaoMotorista();
-      }, 6000);
+      setTimeout(() => { fecharNotificacaoMotorista(); }, 6000);
     }
 
     function fecharNotificacaoMotorista() {
@@ -381,6 +368,9 @@
 
       await atualizarMotos();
 
+      // Consulta contínua a cada 4 segundos para garantir atualização do mapa no celular
+      setInterval(atualizarMotos, 4000);
+
       supabaseClient
         .channel('motos-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'motoristas' }, () => atualizarMotos())
@@ -389,12 +379,9 @@
 
     async function carregarEExibirPassageirosNoMapaMotorista() {
       async function buscarEPintarPassageiros() {
-        const cincoMinutosAtras = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-
         const { data: passData, error: passError } = await supabaseClient
           .from('passageiros')
-          .select('*')
-          .gte('atualizado_em', cincoMinutosAtras);
+          .select('*');
         
         if (!passError && passData && driverMap) {
           const telefonesAtuais = passData.map(p => p.telefone);
@@ -426,13 +413,13 @@
 
       await buscarEPintarPassageiros();
 
-      // NOTIFICA O MOTORISTA SE HOUVER NOVO PASSAGEIRO CONECTADO (INSERT OU UPDATE COM ENTRADA)
+      setInterval(buscarEPintarPassageiros, 4000);
+
       supabaseClient
         .channel('passageiros-em-tempo-real')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'passageiros' }, (payload) => {
           if (payload.new && payload.new.nome) {
             const tel = payload.new.telefone;
-            // Notifica apenas se for uma nova conexão e não o próprio número do motorista
             if (!passengerMarkers[tel] && (!currentUser || currentUser.phone !== tel)) {
               exibirNotificacaoMotorista(`👤 Cliente On-line: ${payload.new.nome} abriu o app!`);
             }
