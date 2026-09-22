@@ -255,6 +255,17 @@
       async function atualizarMotos() {
         const { data, error } = await supabaseClient.from('motoristas').select('*');
         if (!error && data && passengerMap) {
+          const placasAtivas = data.map(m => m.placa);
+          
+          // Remove motoristas desconectados
+          Object.keys(driverMarkers).forEach(placa => {
+            if (!placasAtivas.includes(placa)) {
+              passengerMap.removeLayer(driverMarkers[placa]);
+              delete driverMarkers[placa];
+            }
+          });
+
+          // Adiciona ou atualiza motoristas ativos no mapa
           data.forEach(m => {
             if (m.lat && m.lng) {
               if (driverMarkers[m.placa]) {
@@ -279,7 +290,6 @@
 
     async function carregarEExibirPassageirosNoMapaMotorista() {
       async function buscarEPintarPassageiros() {
-        const { data, error } = await supabaseClient.from('motoristas').select('*');
         const { data: passData, error: passError } = await supabaseClient.from('passageiros').select('*');
         
         if (!passError && passData && driverMap) {
@@ -352,7 +362,7 @@
     }
 
     async function onPassengerMapClick(e) {
-      if (activeRideId) return; // Bloqueia novos cliques durante corrida ativa
+      if (activeRideId) return;
 
       destino = [e.latlng.lat, e.latlng.lng];
 
@@ -513,7 +523,6 @@
       await supabaseClient.from('corridas').update({ status: 'aceita' }).eq('id', pendingRide.id);
       activeRideId = pendingRide.id;
       
-      // Limpa a linha pontilhada da busca inicial ao aceitar a corrida
       if (dPickupRouteLine) {
         driverMap.removeLayer(dPickupRouteLine);
         dPickupRouteLine = null;
@@ -533,7 +542,6 @@
       activeRideId = null;
       pendingRide = null;
 
-      // Limpa todas as rotas e marcações do mapa do motorista
       limparRotasMapaMotorista();
 
       if (driverMap && driverPos) {
