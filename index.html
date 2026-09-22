@@ -157,7 +157,10 @@
     </div>
 
     <div class="bottom-card" id="driver-active-card" style="display: none;">
-      <div style="color: #27ae60; font-weight: bold; margin-bottom: 6px;">✅ Corrida Aceita - Em Andamento</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <span style="color: #27ae60; font-weight: bold;">✅ Corrida Aceita - Em Andamento</span>
+        <span class="price-tag" id="driver-active-ride-price">R$ 0,00</span>
+      </div>
       <div class="info-text" id="driver-active-passenger-info"><b>Passageiro:</b> --</div>
       <button class="btn-primary" id="btn-finish-ride" onclick="finalizarCorrida()">CONCLUIR CORRIDA</button>
     </div>
@@ -184,7 +187,7 @@
     
     let driverMarkers = {}; 
     let passengerMarkers = {};
-    let wakeLock = null; // Guardará o bloqueador de descanso de tela
+    let wakeLock = null;
 
     let origem = [-21.5431, -43.0108]; 
     let driverPos = [-21.5431, -43.0108]; 
@@ -284,7 +287,6 @@
 
       currentUser = { name, phone, plate, role: currentRole };
 
-      // Manter a tela sempre ligada para não fechar/bloquear o app
       ativarManterTelaAcesa();
 
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -424,7 +426,6 @@
 
       await buscarEPintarPassageiros();
 
-      // NOTIFICA O MOTORISTA ASSIM QUE UM CLIENTE NOVO ENTRAR NO BANCO
       supabaseClient
         .channel('passageiros-em-tempo-real')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'passageiros' }, (payload) => {
@@ -544,12 +545,13 @@
         .channel(`corrida-passageiro-${rideId}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'corridas', filter: `id=eq.${rideId}` }, (payload) => {
           const status = payload.new.status;
+          const valorFormatado = payload.new.valor ? payload.new.valor.toFixed(2).replace('.', ',') : '0,00';
           
           if (status === 'aceita') {
-            document.getElementById('status-box').innerText = '✅ Motorista aceitou! Ele está a caminho.';
+            document.getElementById('status-box').innerHTML = `✅ Motorista aceitou! Ele está a caminho.<br><span style="font-size:16px; color:#2e7d32;">Valor: R$ ${valorFormatado}</span>`;
             document.getElementById('status-box').style.color = '#27ae60';
           } else if (status === 'concluida') {
-            alert('🎉 Sua corrida foi concluída com sucesso!');
+            alert(`🎉 Sua corrida foi concluída com sucesso! Valor total: R$ ${valorFormatado}`);
             resetarEstadoPassageiro();
           }
         })
@@ -578,7 +580,7 @@
           pendingRide = data[0];
           document.getElementById('driver-empty-box').style.display = 'none';
           document.getElementById('driver-request-card').style.display = 'block';
-          document.getElementById('driver-ride-price').innerText = `R$ ${pendingRide.valor.toFixed(2)}`;
+          document.getElementById('driver-ride-price').innerText = `R$ ${pendingRide.valor.toFixed(2).replace('.', ',')}`;
           document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
           exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
@@ -644,6 +646,7 @@
 
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
+      document.getElementById('driver-active-ride-price').innerText = `R$ ${pendingRide.valor.toFixed(2).replace('.', ',')}`;
       document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
     }
 
