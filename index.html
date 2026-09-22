@@ -164,10 +164,20 @@
     const TAXA_MINIMA = 5.00;
     const PRECO_POR_KM = 2.50;
 
+    // Ícones Padrão do Leaflet
     const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const blueIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const redIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41] });
-    const motoIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/171/171238.png', iconSize: [32, 32], iconAnchor: [16, 16] });
+
+    // Ícone da Moto em SVG (garante carregamento 100% confiável e offline)
+    const motoSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23ffc107" stroke="%23000000" stroke-width="3"/><circle cx="20" cy="42" r="8" fill="%23222222"/><circle cx="44" cy="42" r="8" fill="%23222222"/><path d="M20 42 L26 26 L36 26 L42 34 L44 42" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 26 L32 18 L38 18" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round"/></svg>`;
+
+    const motoIcon = L.icon({
+      iconUrl: motoSvg,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+      popupAnchor: [0, -18]
+    });
 
     function setRole(newRole) {
       currentRole = newRole;
@@ -257,7 +267,6 @@
         if (!error && data && passengerMap) {
           const placasAtivas = data.map(m => m.placa);
           
-          // Remove motoristas desconectados
           Object.keys(driverMarkers).forEach(placa => {
             if (!placasAtivas.includes(placa)) {
               passengerMap.removeLayer(driverMarkers[placa]);
@@ -265,7 +274,6 @@
             }
           });
 
-          // Adiciona ou atualiza motoristas ativos no mapa do passageiro
           data.forEach(m => {
             if (m.lat && m.lng) {
               if (driverMarkers[m.placa]) {
@@ -329,7 +337,7 @@
       if (!driverMap) {
         driverMap = L.map('driver-map').setView(driverPos, 16);
         L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(driverMap);
-        dSelfMarker = L.marker(driverPos, { icon: motoIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`);
+        dSelfMarker = L.marker(driverPos, { icon: motoIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`).openPopup();
       } else {
         driverMap.invalidateSize();
       }
@@ -504,7 +512,6 @@
 
         if (dataBusca.routes && dataBusca.routes.length > 0) {
           const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          // Mantém a linha pontilhada da busca da moto até o passageiro
           dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
         }
 
