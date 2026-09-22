@@ -38,6 +38,30 @@
 
     .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* ESTILO DO BANNER DE NOTIFICAÇÃO DO MOTORISTA */
+    .driver-notification {
+      position: absolute;
+      top: 70px;
+      left: 16px;
+      right: 16px;
+      background: #27ae60;
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      animation: slideDown 0.3s ease-out;
+    }
+    @keyframes slideDown {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
   </style>
 </head>
 <body>
@@ -111,6 +135,12 @@
       <button onclick="sairDaConta()" style="background: #ffc107; color: #000;">Sair / Trocar Perfil</button>
     </header>
 
+    <!-- BANNER DE NOTIFICAÇÃO EM TEMPO REAL -->
+    <div id="driver-notification" class="driver-notification">
+      <span id="driver-notification-msg">👤 Um cliente entrou no aplicativo!</span>
+      <span style="cursor: pointer; margin-left: 10px;" onclick="fecharNotificacaoMotorista()">✕</span>
+    </div>
+
     <div id="driver-map" class="map-container"></div>
 
     <div id="driver-empty-box" class="bottom-card" style="text-align: center; color: #666; font-weight: bold;">
@@ -154,6 +184,7 @@
     
     let driverMarkers = {}; 
     let passengerMarkers = {};
+    let wakeLock = null; // Guardará o bloqueador de descanso de tela
 
     let origem = [-21.5431, -43.0108]; 
     let driverPos = [-21.5431, -43.0108]; 
@@ -179,6 +210,60 @@
       popupAnchor: [0, -18]
     });
 
+    // EVITA QUE A TELA DO CELULAR / NAVEGADOR APAGUE (WAKE LOCK API)
+    async function ativarManterTelaAcesa() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log("Tela configurada para manter-se acesa.");
+        } catch (err) {
+          console.warn("Não foi possível impedir o descanso de tela:", err.message);
+        }
+      }
+    }
+
+    function desativarManterTelaAcesa() {
+      if (wakeLock !== null) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    }
+
+    // EMITE UM SINAL SONORO SUAVE AO RECEBER NOTIFICAÇÃO
+    function tocarSinalNotificacao() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+      } catch (e) {
+        console.log("Áudio indisponível:", e);
+      }
+    }
+
+    function exibirNotificacaoMotorista(mensagem) {
+      const el = document.getElementById('driver-notification');
+      document.getElementById('driver-notification-msg').innerText = mensagem;
+      el.style.display = 'flex';
+      tocarSinalNotificacao();
+
+      setTimeout(() => {
+        fecharNotificacaoMotorista();
+      }, 6000);
+    }
+
+    function fecharNotificacaoMotorista() {
+      document.getElementById('driver-notification').style.display = 'none';
+    }
+
     function setRole(newRole) {
       currentRole = newRole;
       document.getElementById('tab-passenger').classList.toggle('active', newRole === 'passageiro');
@@ -198,6 +283,9 @@
       }
 
       currentUser = { name, phone, plate, role: currentRole };
+
+      // Manter a tela sempre ligada para não fechar/bloquear o app
+      ativarManterTelaAcesa();
 
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
 
@@ -336,9 +424,19 @@
 
       await buscarEPintarPassageiros();
 
+      // NOTIFICA O MOTORISTA ASSIM QUE UM CLIENTE NOVO ENTRAR NO BANCO
       supabaseClient
         .channel('passageiros-em-tempo-real')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'passageiros' }, () => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'passageiros' }, (payload) => {
+          if (payload.new && payload.new.nome) {
+            exibirNotificacaoMotorista(`👤 Cliente On-line: ${payload.new.nome} abriu o app!`);
+          }
+          buscarEPintarPassageiros();
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'passageiros' }, () => {
+          buscarEPintarPassageiros();
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'passageiros' }, () => {
           buscarEPintarPassageiros();
         })
         .subscribe();
@@ -484,6 +582,8 @@
           document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
           exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
+          
+          exibirNotificacaoMotorista(`🚖 Nova corrida solicitada por ${pendingRide.origem_endereco}!`);
         } else {
           pendingRide = null;
           limparRotasMapaMotorista();
@@ -569,6 +669,7 @@
 
     async function removerUsuarioSincrono() {
       if (!currentUser) return;
+      desativarManterTelaAcesa();
       if (currentUser.role === 'passageiro' && currentUser.phone) {
         await supabaseClient.from('passageiros').delete().eq('telefone', currentUser.phone);
       } else if (currentUser.role === 'motorista' && currentUser.plate) {
