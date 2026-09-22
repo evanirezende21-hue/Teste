@@ -268,7 +268,6 @@
         if (!error && data && passengerMap) {
           const placasAtivas = data.map(m => m.placa);
           
-          // Limpa do mapa motoristas que foram removidos do banco
           Object.keys(driverMarkers).forEach(placa => {
             if (!placasAtivas.includes(placa)) {
               passengerMap.removeLayer(driverMarkers[placa]);
@@ -279,10 +278,8 @@
           data.forEach(m => {
             if (m.lat && m.lng) {
               if (driverMarkers[m.placa]) {
-                // Atualiza APENAS a posição da moto existente (não duplica no mapa)
                 driverMarkers[m.placa].setLatLng([m.lat, m.lng]);
               } else {
-                // Cria um único marcador por placa
                 driverMarkers[m.placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                   .addTo(passengerMap)
                   .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`);
@@ -302,7 +299,12 @@
 
     async function carregarEExibirPassageirosNoMapaMotorista() {
       async function buscarEPintarPassageiros() {
-        const { data: passData, error: passError } = await supabaseClient.from('passageiros').select('*');
+        const cincoMinutosAtras = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+        const { data: passData, error: passError } = await supabaseClient
+          .from('passageiros')
+          .select('*')
+          .gte('atualizado_em', cincoMinutosAtras);
         
         if (!passError && passData && driverMap) {
           const telefonesAtuais = passData.map(p => p.telefone);
@@ -367,7 +369,6 @@
             exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
           }
 
-          // Atualiza a linha existente usando a placa como chave única (onConflict)
           await supabaseClient.from('motoristas').upsert([{
             nome: currentUser.name,
             placa: currentUser.plate,
