@@ -265,7 +265,7 @@
             }
           });
 
-          // Adiciona ou atualiza motoristas ativos no mapa
+          // Adiciona ou atualiza motoristas ativos no mapa do passageiro
           data.forEach(m => {
             if (m.lat && m.lng) {
               if (driverMarkers[m.placa]) {
@@ -280,7 +280,7 @@
         }
       }
 
-      atualizarMotos();
+      await atualizarMotos();
 
       supabaseClient
         .channel('motos-realtime')
@@ -315,7 +315,7 @@
         }
       }
 
-      buscarEPintarPassageiros();
+      await buscarEPintarPassageiros();
 
       supabaseClient
         .channel('passageiros-em-tempo-real')
@@ -504,6 +504,7 @@
 
         if (dataBusca.routes && dataBusca.routes.length > 0) {
           const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          // Mantém a linha pontilhada da busca da moto até o passageiro
           dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
         }
 
@@ -522,11 +523,6 @@
       if (!pendingRide) return;
       await supabaseClient.from('corridas').update({ status: 'aceita' }).eq('id', pendingRide.id);
       activeRideId = pendingRide.id;
-      
-      if (dPickupRouteLine) {
-        driverMap.removeLayer(dPickupRouteLine);
-        dPickupRouteLine = null;
-      }
 
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
@@ -553,22 +549,24 @@
       document.getElementById('driver-empty-box').style.display = 'block';
     }
 
-    async function removerUsuarioDoBanco() {
+    function removerUsuarioSincrono() {
       if (!currentUser) return;
       if (currentUser.role === 'passageiro' && currentUser.phone) {
-        await supabaseClient.from('passageiros').delete().eq('telefone', currentUser.phone);
+        navigator.sendBeacon(`${SUPABASE_URL}/rest/v1/passageiros?telefone=eq.${currentUser.phone}`, JSON.stringify({}));
+        supabaseClient.from('passageiros').delete().eq('telefone', currentUser.phone);
       } else if (currentUser.role === 'motorista' && currentUser.plate) {
-        await supabaseClient.from('motoristas').delete().eq('placa', currentUser.plate);
+        navigator.sendBeacon(`${SUPABASE_URL}/rest/v1/motoristas?placa=eq.${currentUser.plate}`, JSON.stringify({}));
+        supabaseClient.from('motoristas').delete().eq('placa', currentUser.plate);
       }
     }
 
     async function sairDaConta() {
-      await removerUsuarioDoBanco();
+      removerUsuarioSincrono();
       location.reload();
     }
 
     window.addEventListener('beforeunload', () => {
-      removerUsuarioDoBanco();
+      removerUsuarioSincrono();
     });
   </script>
 </body>
