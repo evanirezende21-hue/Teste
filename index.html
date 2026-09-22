@@ -169,7 +169,7 @@
     const blueIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const redIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41] });
 
-    // Ícone da Moto em SVG (garante carregamento 100% confiável e offline)
+    // Ícone da Moto SVG
     const motoSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23ffc107" stroke="%23000000" stroke-width="3"/><circle cx="20" cy="42" r="8" fill="%23222222"/><circle cx="44" cy="42" r="8" fill="%23222222"/><path d="M20 42 L26 26 L36 26 L42 34 L44 42" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 26 L32 18 L38 18" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round"/></svg>`;
 
     const motoIcon = L.icon({
@@ -229,7 +229,8 @@
         nome: currentUser.name, 
         telefone: currentUser.phone, 
         lat: lat, 
-        lng: lng 
+        lng: lng,
+        atualizado_em: new Date().toISOString()
       }], { onConflict: 'telefone' });
     }
 
@@ -267,6 +268,7 @@
         if (!error && data && passengerMap) {
           const placasAtivas = data.map(m => m.placa);
           
+          // Limpa do mapa motoristas que foram removidos do banco
           Object.keys(driverMarkers).forEach(placa => {
             if (!placasAtivas.includes(placa)) {
               passengerMap.removeLayer(driverMarkers[placa]);
@@ -277,8 +279,10 @@
           data.forEach(m => {
             if (m.lat && m.lng) {
               if (driverMarkers[m.placa]) {
+                // Atualiza APENAS a posição da moto existente (não duplica no mapa)
                 driverMarkers[m.placa].setLatLng([m.lat, m.lng]);
               } else {
+                // Cria um único marcador por placa
                 driverMarkers[m.placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                   .addTo(passengerMap)
                   .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`);
@@ -302,6 +306,7 @@
         
         if (!passError && passData && driverMap) {
           const telefonesAtuais = passData.map(p => p.telefone);
+
           Object.keys(passengerMarkers).forEach(tel => {
             if (!telefonesAtuais.includes(tel)) {
               driverMap.removeLayer(passengerMarkers[tel]);
@@ -310,6 +315,10 @@
           });
 
           passData.forEach(p => {
+            if (currentUser && currentUser.phone && p.telefone === currentUser.phone) {
+              return;
+            }
+
             if (p.lat && p.lng) {
               if (passengerMarkers[p.telefone]) {
                 passengerMarkers[p.telefone].setLatLng([p.lat, p.lng]);
@@ -358,6 +367,7 @@
             exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
           }
 
+          // Atualiza a linha existente usando a placa como chave única (onConflict)
           await supabaseClient.from('motoristas').upsert([{
             nome: currentUser.name,
             placa: currentUser.plate,
@@ -556,19 +566,17 @@
       document.getElementById('driver-empty-box').style.display = 'block';
     }
 
-    function removerUsuarioSincrono() {
+    async function removerUsuarioSincrono() {
       if (!currentUser) return;
       if (currentUser.role === 'passageiro' && currentUser.phone) {
-        navigator.sendBeacon(`${SUPABASE_URL}/rest/v1/passageiros?telefone=eq.${currentUser.phone}`, JSON.stringify({}));
-        supabaseClient.from('passageiros').delete().eq('telefone', currentUser.phone);
+        await supabaseClient.from('passageiros').delete().eq('telefone', currentUser.phone);
       } else if (currentUser.role === 'motorista' && currentUser.plate) {
-        navigator.sendBeacon(`${SUPABASE_URL}/rest/v1/motoristas?placa=eq.${currentUser.plate}`, JSON.stringify({}));
-        supabaseClient.from('motoristas').delete().eq('placa', currentUser.plate);
+        await supabaseClient.from('motoristas').delete().eq('placa', currentUser.plate);
       }
     }
 
     async function sairDaConta() {
-      removerUsuarioSincrono();
+      await removerUsuarioSincrono();
       location.reload();
     }
 
