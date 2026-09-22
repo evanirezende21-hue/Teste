@@ -38,29 +38,6 @@
 
     .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-
-    .driver-notification {
-      position: absolute;
-      top: 70px;
-      left: 16px;
-      right: 16px;
-      background: #27ae60;
-      color: #fff;
-      padding: 12px 16px;
-      border-radius: 12px;
-      font-weight: bold;
-      font-size: 14px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-      z-index: 2000;
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      animation: slideDown 0.3s ease-out;
-    }
-    @keyframes slideDown {
-      from { transform: translateY(-20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
   </style>
 </head>
 <body>
@@ -134,11 +111,6 @@
       <button onclick="sairDaConta()" style="background: #ffc107; color: #000;">Sair / Trocar Perfil</button>
     </header>
 
-    <div id="driver-notification" class="driver-notification">
-      <span id="driver-notification-msg">👤 Um cliente entrou no aplicativo!</span>
-      <span style="cursor: pointer; margin-left: 10px;" onclick="fecharNotificacaoMotorista()">✕</span>
-    </div>
-
     <div id="driver-map" class="map-container"></div>
 
     <div id="driver-empty-box" class="bottom-card" style="text-align: center; color: #666; font-weight: bold;">
@@ -155,10 +127,7 @@
     </div>
 
     <div class="bottom-card" id="driver-active-card" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-        <span style="color: #27ae60; font-weight: bold;">✅ Corrida Aceita - Em Andamento</span>
-        <span class="price-tag" id="driver-active-ride-price">R$ 0,00</span>
-      </div>
+      <div style="color: #27ae60; font-weight: bold; margin-bottom: 6px;">✅ Corrida Aceita - Em Andamento</div>
       <div class="info-text" id="driver-active-passenger-info"><b>Passageiro:</b> --</div>
       <button class="btn-primary" id="btn-finish-ride" onclick="finalizarCorrida()">CONCLUIR CORRIDA</button>
     </div>
@@ -185,7 +154,6 @@
     
     let driverMarkers = {}; 
     let passengerMarkers = {};
-    let wakeLock = null;
 
     let origem = [-21.5431, -43.0108]; 
     let driverPos = [-21.5431, -43.0108]; 
@@ -196,10 +164,12 @@
     const TAXA_MINIMA = 5.00;
     const PRECO_POR_KM = 2.50;
 
+    // Ícones Padrão do Leaflet
     const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const blueIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const redIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41] });
 
+    // Ícone da Moto SVG
     const motoSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23ffc107" stroke="%23000000" stroke-width="3"/><circle cx="20" cy="42" r="8" fill="%23222222"/><circle cx="44" cy="42" r="8" fill="%23222222"/><path d="M20 42 L26 26 L36 26 L42 34 L44 42" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 26 L32 18 L38 18" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round"/></svg>`;
 
     const motoIcon = L.icon({
@@ -208,51 +178,6 @@
       iconAnchor: [18, 18],
       popupAnchor: [0, -18]
     });
-
-    async function ativarManterTelaAcesa() {
-      if ('wakeLock' in navigator) {
-        try {
-          wakeLock = await navigator.wakeLock.request('screen');
-        } catch (err) {}
-      }
-    }
-
-    function desativarManterTelaAcesa() {
-      if (wakeLock !== null) {
-        wakeLock.release();
-        wakeLock = null;
-      }
-    }
-
-    function tocarSinalNotificacao() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.4);
-      } catch (e) {}
-    }
-
-    function exibirNotificacaoMotorista(mensagem) {
-      const el = document.getElementById('driver-notification');
-      document.getElementById('driver-notification-msg').innerText = mensagem;
-      el.style.display = 'flex';
-      tocarSinalNotificacao();
-
-      setTimeout(() => { fecharNotificacaoMotorista(); }, 6000);
-    }
-
-    function fecharNotificacaoMotorista() {
-      document.getElementById('driver-notification').style.display = 'none';
-    }
 
     function setRole(newRole) {
       currentRole = newRole;
@@ -274,16 +199,12 @@
 
       currentUser = { name, phone, plate, role: currentRole };
 
-      ativarManterTelaAcesa();
-
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
 
       if (currentRole === 'passageiro') {
         document.getElementById('passenger-badge').innerText = `${name} (${phone})`;
         document.getElementById('passenger-screen').classList.add('active');
         
-        await atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
-
         setTimeout(() => {
           initPassengerMap();
           carregarEExibirMotoristasNoMapa();
@@ -293,14 +214,6 @@
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
         
-        await supabaseClient.from('motoristas').upsert([{
-          nome: currentUser.name,
-          placa: currentUser.plate,
-          lat: driverPos[0],
-          lng: driverPos[1],
-          atualizado_em: new Date().toISOString()
-        }], { onConflict: 'placa' });
-
         setTimeout(() => {
           initDriverMapBase();
           salvarEAtivarGPSMotorista();
@@ -331,6 +244,8 @@
         passengerMap.setView(origem, 16);
       }
 
+      atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
+
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
           origem = [pos.coords.latitude, pos.coords.longitude];
@@ -340,9 +255,7 @@
             pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
           }
           atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
-        }, (err) => {
-          console.warn("Permissão de GPS pendente ou negada:", err);
-        }, { enableHighAccuracy: true });
+        }, null, { enableHighAccuracy: true });
       }
 
       passengerMap.off('click');
@@ -377,7 +290,6 @@
       }
 
       await atualizarMotos();
-      setInterval(atualizarMotos, 3000);
 
       supabaseClient
         .channel('motos-realtime')
@@ -387,9 +299,12 @@
 
     async function carregarEExibirPassageirosNoMapaMotorista() {
       async function buscarEPintarPassageiros() {
+        const cincoMinutosAtras = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
         const { data: passData, error: passError } = await supabaseClient
           .from('passageiros')
-          .select('*');
+          .select('*')
+          .gte('atualizado_em', cincoMinutosAtras);
         
         if (!passError && passData && driverMap) {
           const telefonesAtuais = passData.map(p => p.telefone);
@@ -420,17 +335,10 @@
       }
 
       await buscarEPintarPassageiros();
-      setInterval(buscarEPintarPassageiros, 3000);
 
       supabaseClient
         .channel('passageiros-em-tempo-real')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'passageiros' }, (payload) => {
-          if (payload.new && payload.new.nome) {
-            const tel = payload.new.telefone;
-            if (!passengerMarkers[tel] && (!currentUser || currentUser.phone !== tel)) {
-              exibirNotificacaoMotorista(`👤 Cliente On-line: ${payload.new.nome} abriu o app!`);
-            }
-          }
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'passageiros' }, () => {
           buscarEPintarPassageiros();
         })
         .subscribe();
@@ -468,9 +376,7 @@
             lng: driverPos[1],
             atualizado_em: new Date().toISOString()
           }], { onConflict: 'placa' });
-        }, (err) => {
-          console.warn("GPS do motorista indisponível:", err);
-        }, { enableHighAccuracy: true });
+        }, null, { enableHighAccuracy: true });
       }
     }
 
@@ -540,13 +446,12 @@
         .channel(`corrida-passageiro-${rideId}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'corridas', filter: `id=eq.${rideId}` }, (payload) => {
           const status = payload.new.status;
-          const valorFormatado = payload.new.valor ? payload.new.valor.toFixed(2).replace('.', ',') : '0,00';
           
           if (status === 'aceita') {
-            document.getElementById('status-box').innerHTML = `✅ Motorista aceitou! Ele está a caminho.<br><span style="font-size:16px; color:#2e7d32;">Valor: R$ ${valorFormatado}</span>`;
+            document.getElementById('status-box').innerText = '✅ Motorista aceitou! Ele está a caminho.';
             document.getElementById('status-box').style.color = '#27ae60';
           } else if (status === 'concluida') {
-            alert(`🎉 Sua corrida foi concluída com sucesso! Valor total: R$ ${valorFormatado}`);
+            alert('🎉 Sua corrida foi concluída com sucesso!');
             resetarEstadoPassageiro();
           }
         })
@@ -575,12 +480,10 @@
           pendingRide = data[0];
           document.getElementById('driver-empty-box').style.display = 'none';
           document.getElementById('driver-request-card').style.display = 'block';
-          document.getElementById('driver-ride-price').innerText = `R$ ${pendingRide.valor.toFixed(2).replace('.', ',')}`;
+          document.getElementById('driver-ride-price').innerText = `R$ ${pendingRide.valor.toFixed(2)}`;
           document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
           exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
-          
-          exibirNotificacaoMotorista(`🚖 Nova corrida solicitada por ${pendingRide.origem_endereco}!`);
         } else {
           pendingRide = null;
           limparRotasMapaMotorista();
@@ -603,6 +506,7 @@
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
       if (!driverMap) initDriverMapBase();
 
+      // Limpa todas as linhas/marcadores antigos antes de desenhar a nova rota
       limparRotasMapaMotorista();
 
       dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Passageiro Esperando Aqui</b>");
@@ -641,7 +545,6 @@
 
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
-      document.getElementById('driver-active-ride-price').innerText = `R$ ${pendingRide.valor.toFixed(2).replace('.', ',')}`;
       document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
     }
 
@@ -654,6 +557,7 @@
       activeRideId = null;
       pendingRide = null;
 
+      // Limpa rigorosamente do mapa todas as rotas desenhadas da corrida finalizada
       limparRotasMapaMotorista();
 
       if (driverMap && driverPos) {
@@ -667,7 +571,6 @@
 
     async function removerUsuarioSincrono() {
       if (!currentUser) return;
-      desativarManterTelaAcesa();
       if (currentUser.role === 'passageiro' && currentUser.phone) {
         await supabaseClient.from('passageiros').delete().eq('telefone', currentUser.phone);
       } else if (currentUser.role === 'motorista' && currentUser.plate) {
