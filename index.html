@@ -413,7 +413,7 @@
           }
 
           if (pendingRide) {
-            exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
+            atualizarRotaBuscaMotorista([pendingRide.origem_lat, pendingRide.origem_lng]);
           }
 
           await supabaseClient.from('motoristas').upsert([{
@@ -424,6 +424,34 @@
             atualizado_em: new Date().toISOString()
           }], { onConflict: 'placa' });
         }, null, { enableHighAccuracy: true });
+      }
+    }
+
+    async function atualizarRotaBuscaMotorista(pOrigemPassageiro) {
+      if (!driverMap) return;
+
+      if (dPickupRouteLine) {
+        driverMap.removeLayer(dPickupRouteLine);
+        dPickupRouteLine = null;
+      }
+
+      const distAtePassageiro = L.latLng(driverPos).distanceTo(L.latLng(pOrigemPassageiro));
+      if (distAtePassageiro < 15) {
+        return;
+      }
+
+      const urlBusca = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
+
+      try {
+        const resBusca = await fetch(urlBusca);
+        const dataBusca = await resBusca.json();
+
+        if (dataBusca.routes && dataBusca.routes.length > 0) {
+          const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
+        }
+      } catch (e) {
+        console.error("Erro ao atualizar rota de busca:", e);
       }
     }
 
