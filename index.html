@@ -186,8 +186,54 @@
       document.getElementById('group-phone').style.display = newRole === 'passageiro' ? 'block' : 'none';
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
+// Função para emitir o som de alerta (Beep) usando o próprio sintetizador do navegador (sem depender de MP3 externo)
+    function tocarAlertaSonoro() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
 
-    async function entrarNoApp() {
+        const tocarBip = (freq, tempoInicio, duracao) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.3, ctx.currentTime + tempoInicio);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + tempoInicio + duracao);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + tempoInicio);
+          osc.stop(ctx.currentTime + tempoInicio + duracao);
+        };
+
+        // Toca 3 bips curtos e chamativos
+        tocarBip(880, 0, 0.2);
+        tocarBip(1100, 0.25, 0.2);
+        tocarBip(1320, 0.5, 0.3);
+      } catch (e) {
+        console.error("Erro ao reproduzir alerta sonoro:", e);
+      }
+    }
+
+    // Função para disparar a notificação visual e a vibração
+    function notificarNovaSolicitacao(valor, passageiro) {
+      // 1. Som
+      tocarAlertaSonoro();
+
+      // 2. Vibração (se suportado pelo dispositivo móvel)
+      if (navigator.vibrate) {
+        navigator.vibrate([300, 150, 300, 150, 400]);
+      }
+
+      // 3. Notificação Pop-up do Sistema/Navegador
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🚨 Nova Corrida - Moto Táxi SJN', {
+          body: `Valor: R$ ${valor} | Passageiro: ${passageiro}`,
+          icon: motoSvg
+        });
+      }
+    }
+async function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
       const phone = document.getElementById('user-phone').value.trim();
       const plate = document.getElementById('user-plate').value.trim();
@@ -198,6 +244,11 @@
       }
 
       currentUser = { name, phone, plate, role: currentRole };
+
+      // Solicita permissão para notificações nativas do sistema no perfil do motorista
+      if (currentRole === 'motorista' && 'Notification' in window) {
+        Notification.requestPermission();
+      }
 
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
 
@@ -221,7 +272,7 @@
           escutarCorridasMotorista();
         }, 100);
       }
-    }
+    }    
 
     async function atualizarPosicaoPassageiroNoBanco(lat, lng) {
       if (!currentUser || currentUser.role !== 'passageiro') return;
@@ -477,10 +528,21 @@
         const { data } = await supabaseClient.from('corridas').select('*').eq('status', 'solicitada').limit(1);
 
         if (data && data.length > 0) {
-          pendingRide = data[0];
+          const corridaEncontrada = data[0];
+
+          // Se for uma nova corrida recebida e ainda não notificada, dispara o alerta
+          if (!pendingRide || pendingRide.id !== corridaEncontrada.id) {
+            pendingRide = corridaEncontrada;
+            const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
+            
+            // Dispara Som, Vibração e Notificação Nativade Tela
+            notificarNovaSolicitacao(valorFormatado, pendingRide.origem_endereco);
+          }
+
           document.getElementById('driver-empty-box').style.display = 'none';
           document.getElementById('driver-request-card').style.display = 'block';
-          document.getElementById('driver-ride-price').innerText = `R$ ${pendingRide.valor.toFixed(2)}`;
+          const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
+          document.getElementById('driver-ride-price').innerText = `R$ ${valorFormatado}`;
           document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
           exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
@@ -492,6 +554,7 @@
           document.getElementById('driver-active-card').style.display = 'none';
         }
       }
+
       buscarSolicitacoes();
       supabaseClient.channel('corridas-driver').on('postgres_changes', { event: '*', schema: 'public', table: 'corridas' }, () => buscarSolicitacoes()).subscribe();
     }
