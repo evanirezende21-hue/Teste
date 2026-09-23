@@ -42,54 +42,6 @@
 </head>
 <body>
 
-// Função para emitir o som de alerta (Beep) usando o próprio sintetizador do navegador (sem depender de MP3 externo)
-    function tocarAlertaSonoro() {
-      try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-
-        const tocarBip = (freq, tempoInicio, duracao) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime + tempoInicio);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + tempoInicio + duracao);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(ctx.currentTime + tempoInicio);
-          osc.stop(ctx.currentTime + tempoInicio + duracao);
-        };
-
-        // Toca 3 bips curtos e chamativos
-        tocarBip(880, 0, 0.2);
-        tocarBip(1100, 0.25, 0.2);
-        tocarBip(1320, 0.5, 0.3);
-      } catch (e) {
-        console.error("Erro ao reproduzir alerta sonoro:", e);
-      }
-    }
-
-    // Função para disparar a notificação visual e a vibração
-    function notificarNovaSolicitacao(valor, passageiro) {
-      // 1. Som
-      tocarAlertaSonoro();
-
-      // 2. Vibração (se suportado pelo dispositivo móvel)
-      if (navigator.vibrate) {
-        navigator.vibrate([300, 150, 300, 150, 400]);
-      }
-
-      // 3. Notificação Pop-up do Sistema/Navegador
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('🚨 Nova Corrida - Moto Táxi SJN', {
-          body: `Valor: R$ ${valor} | Passageiro: ${passageiro}`,
-          icon: motoSvg
-        });
-      }
-    }
-
   <!-- LOGIN / CADASTRO -->
   <div id="auth-screen" class="screen active">
     <div class="auth-card">
@@ -212,10 +164,12 @@
     const TAXA_MINIMA = 5.00;
     const PRECO_POR_KM = 2.50;
 
+    // Ícones Padrão do Leaflet
     const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const blueIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
     const redIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41] });
 
+    // Ícone da Moto SVG
     const motoSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23ffc107" stroke="%23000000" stroke-width="3"/><circle cx="20" cy="42" r="8" fill="%23222222"/><circle cx="44" cy="42" r="8" fill="%23222222"/><path d="M20 42 L26 26 L36 26 L42 34 L44 42" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 26 L32 18 L38 18" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round"/></svg>`;
 
     const motoIcon = L.icon({
@@ -232,7 +186,8 @@
       document.getElementById('group-phone').style.display = newRole === 'passageiro' ? 'block' : 'none';
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
-async function entrarNoApp() {
+
+    async function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
       const phone = document.getElementById('user-phone').value.trim();
       const plate = document.getElementById('user-plate').value.trim();
@@ -243,11 +198,6 @@ async function entrarNoApp() {
       }
 
       currentUser = { name, phone, plate, role: currentRole };
-
-      // Solicita permissão para notificações nativas do sistema no perfil do motorista
-      if (currentRole === 'motorista' && 'Notification' in window) {
-        Notification.requestPermission();
-      }
 
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
 
@@ -272,20 +222,6 @@ async function entrarNoApp() {
         }, 100);
       }
     }
-    
-
-      
-
-      
-     
-
-      
-        
-        
-
-      
-        
-       
 
     async function atualizarPosicaoPassageiroNoBanco(lat, lng) {
       if (!currentUser || currentUser.role !== 'passageiro') return;
@@ -467,7 +403,7 @@ async function entrarNoApp() {
           document.getElementById('instruction-text').style.display = 'none';
           document.getElementById('ride-details').style.display = 'block';
           document.getElementById('distance-text').innerText = `Distância: ${distanciaKm.toFixed(2)} km`;
-          document.getElementById('price-text').innerText = `R$ ${valorEstimado.toFixed(2).replace('.', ',')}`;
+          document.getElementById('price-text').innerText = `R$ ${valorEstimado.toFixed(2)}`;
 
           const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           
@@ -495,11 +431,11 @@ async function entrarNoApp() {
         status: 'solicitada'
       }]).select();
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         activeRideId = data[0].id;
         document.getElementById('ride-details').style.display = 'none';
         document.getElementById('status-box').style.display = 'block';
-        document.getElementById('status-box').innerText = `⏳ Aguardando motorista aceitar... (Valor: R$ ${valorEstimado.toFixed(2).replace('.', ',')})`;
+        document.getElementById('status-box').innerText = '⏳ Aguardando motorista aceitar...';
 
         escutarStatusCorridaPassageiro(activeRideId);
       }
@@ -508,8 +444,8 @@ async function entrarNoApp() {
     function escutarStatusCorridaPassageiro(rideId) {
       supabaseClient
         .channel(`corrida-passageiro-${rideId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'corridas', filter: `id=eq.${rideId}` }, (payload) => {
-          const status = payload.new ? payload.new.status : null;
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'corridas', filter: `id=eq.${rideId}` }, (payload) => {
+          const status = payload.new.status;
           
           if (status === 'aceita') {
             document.getElementById('status-box').innerText = '✅ Motorista aceitou! Ele está a caminho.';
@@ -541,21 +477,10 @@ async function entrarNoApp() {
         const { data } = await supabaseClient.from('corridas').select('*').eq('status', 'solicitada').limit(1);
 
         if (data && data.length > 0) {
-          const corridaEncontrada = data[0];
-
-          // Se for uma nova corrida recebida e ainda não notificada, dispara o alerta
-          if (!pendingRide || pendingRide.id !== corridaEncontrada.id) {
-            pendingRide = corridaEncontrada;
-            const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
-            
-            // Dispara Som, Vibração e Notificação Nativade Tela
-            notificarNovaSolicitacao(valorFormatado, pendingRide.origem_endereco);
-          }
-
+          pendingRide = data[0];
           document.getElementById('driver-empty-box').style.display = 'none';
           document.getElementById('driver-request-card').style.display = 'block';
-          const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
-          document.getElementById('driver-ride-price').innerText = `R$ ${valorFormatado}`;
+          document.getElementById('driver-ride-price').innerText = `R$ ${pendingRide.valor.toFixed(2)}`;
           document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
           exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
@@ -567,10 +492,10 @@ async function entrarNoApp() {
           document.getElementById('driver-active-card').style.display = 'none';
         }
       }
-
       buscarSolicitacoes();
       supabaseClient.channel('corridas-driver').on('postgres_changes', { event: '*', schema: 'public', table: 'corridas' }, () => buscarSolicitacoes()).subscribe();
     }
+
     function limparRotasMapaMotorista() {
       if (dOrigMarker) { driverMap.removeLayer(dOrigMarker); dOrigMarker = null; }
       if (dDestMarker) { driverMap.removeLayer(dDestMarker); dDestMarker = null; }
@@ -581,6 +506,7 @@ async function entrarNoApp() {
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
       if (!driverMap) initDriverMapBase();
 
+      // Limpa todas as linhas/marcadores antigos antes de desenhar a nova rota
       limparRotasMapaMotorista();
 
       dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Passageiro Esperando Aqui</b>");
@@ -624,26 +550,23 @@ async function entrarNoApp() {
 
     async function finalizarCorrida() {
       if (!activeRideId) return;
+      await supabaseClient.from('corridas').update({ status: 'concluida' }).eq('id', activeRideId);
       
-      try {
-        await supabaseClient.from('corridas').update({ status: 'concluida' }).eq('id', activeRideId);
-        alert('🎉 Corrida concluída com sucesso!');
-      } catch (e) {
-        console.error("Erro ao finalizar corrida:", e);
-      } finally {
-        activeRideId = null;
-        pendingRide = null;
+      alert('Corrida concluída com sucesso!');
 
-        limparRotasMapaMotorista();
+      activeRideId = null;
+      pendingRide = null;
 
-        if (driverMap && driverPos) {
-          driverMap.setView(driverPos, 16);
-        }
+      // Limpa rigorosamente do mapa todas as rotas desenhadas da corrida finalizada
+      limparRotasMapaMotorista();
 
-        document.getElementById('driver-active-card').style.display = 'none';
-        document.getElementById('driver-request-card').style.display = 'none';
-        document.getElementById('driver-empty-box').style.display = 'block';
+      if (driverMap && driverPos) {
+        driverMap.setView(driverPos, 16);
       }
+
+      document.getElementById('driver-active-card').style.display = 'none';
+      document.getElementById('driver-request-card').style.display = 'none';
+      document.getElementById('driver-empty-box').style.display = 'block';
     }
 
     async function removerUsuarioSincrono() {
