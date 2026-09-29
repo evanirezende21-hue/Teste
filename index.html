@@ -146,13 +146,13 @@
   <script>
     // CONFIGURAÇÃO DO SEU PROJETO NO FIREBASE
     const firebaseConfig = {
-      apiKey: "AIzaSyCHZvFu6YPrrLB-ssTJ2gES_QaQASLVy9M", // ⚠️ Substitua pela sua apiKey do Firebase
+      apiKey: "COLE_SUA_API_KEY_AQUI", // ⚠️ Substitua pela sua apiKey do Firebase
       authDomain: "moto-taxi-sjn-d9b71.firebaseapp.com",
       databaseURL: "https://moto-taxi-sjn-d9b71-default-rtdb.firebaseio.com",
       projectId: "moto-taxi-sjn-d9b71",
       storageBucket: "moto-taxi-sjn-d9b71.appspot.com",
       messagingSenderId: "13246123116",
-      appId: "1:13246123116:web:85941b49c4f5528ca05c49" // ⚠️ Substitua pelo seu appId do Firebase
+      appId: "COLE_SEU_APP_ID_AQUI" // ⚠️ Substitua pelo seu appId do Firebase
     };
 
     // Inicializa o Firebase
@@ -267,14 +267,32 @@
       passengerMap.on('click', onPassengerMapClick);
     }
 
+    // EXIBE MOTORISTAS APENAS SE ESTIVEREM CONECTADOS
     function carregarEExibirMotoristasNoMapa() {
       db.ref('motoristas').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (!data || !passengerMap) return;
+        const data = snapshot.val() || {};
+        if (!passengerMap) return;
 
+        const agora = Date.now();
+        const UM_MINUTO = 60 * 1000;
+
+        // Limpa do mapa motoristas que foram removidos ou estão offline
+        Object.keys(driverMarkers).forEach(placa => {
+          const m = data[placa];
+          const isOffline = !m || m.online === false || !m.updatedAt || (agora - m.updatedAt > UM_MINUTO);
+
+          if (isOffline) {
+            passengerMap.removeLayer(driverMarkers[placa]);
+            delete driverMarkers[placa];
+          }
+        });
+
+        // Adiciona apenas motoristas online e com atualização recente
         Object.keys(data).forEach(placa => {
           const m = data[placa];
-          if (m.lat && m.lng) {
+          const isOnline = m && m.online !== false && m.updatedAt && (agora - m.updatedAt <= UM_MINUTO);
+
+          if (isOnline && m.lat && m.lng) {
             if (driverMarkers[placa]) {
               driverMarkers[placa].setLatLng([m.lat, m.lng]);
             } else {
@@ -298,17 +316,23 @@
     }
 
     function salvarEAtivarGPSMotorista() {
+      const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+      const driverRef = db.ref('motoristas/' + keyPlate);
+
+      // QUANDO DESCONECTAR OU FECHAR A PÁGINA: REMOVE O MOTORISTA AUTOMATICAMENTE DO FIREBASE
+      driverRef.onDisconnect().remove();
+
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
           driverPos = [pos.coords.latitude, pos.coords.longitude];
           if (dSelfMarker) dSelfMarker.setLatLng(driverPos);
 
-          const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
-          db.ref('motoristas/' + keyPlate).set({
+          driverRef.set({
             nome: currentUser.name,
             placa: currentUser.plate,
             lat: driverPos[0],
             lng: driverPos[1],
+            online: true,
             updatedAt: Date.now()
           });
         }, null, { enableHighAccuracy: true });
@@ -317,8 +341,15 @@
 
     function carregarEExibirPassageirosNoMapaMotorista() {
       db.ref('passageiros').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (!data || !driverMap) return;
+        const data = snapshot.val() || {};
+        if (!driverMap) return;
+
+        Object.keys(passengerMarkers).forEach(key => {
+          if (!data[key]) {
+            driverMap.removeLayer(passengerMarkers[key]);
+            delete passengerMarkers[key];
+          }
+        });
 
         Object.keys(data).forEach(key => {
           const p = data[key];
@@ -373,8 +404,11 @@
       const newRideRef = db.ref('corridas').push();
       activeRideId = newRideRef.key;
 
+      const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+
       const rideData = {
         id: activeRideId,
+        passageiroKey: keyPhone,
         origem_endereco: `${currentUser.name} (${currentUser.phone})`,
         origem_lat: origem[0],
         origem_lng: origem[1],
@@ -410,6 +444,11 @@
     }
 
     function resetarEstadoPassageiro() {
+      if (currentUser && currentUser.phone) {
+        const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+        db.ref('passageiros/' + keyPhone).remove();
+      }
+
       activeRideId = null;
       destino = null;
       if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
@@ -488,8 +527,6 @@
 
       db.ref('corridas/' + activeRideId).update({ status: 'aceita' });
 
-      limparRotasMapaMotorista();
-
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
@@ -502,13 +539,21 @@
 
       const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
 
-      db.ref('corridas/' + activeRideId).update({ status: 'concluida' });
+      if (pendingRide && pendingRide.passageiroKey) {
+        db.ref('passageiros/' + pendingRide.passageiroKey).remove();
+      }
+
+      const rideRef = db.ref('corridas/' + activeRideId);
+      rideRef.update({ status: 'concluida' }).then(() => {
+        setTimeout(() => rideRef.remove(), 2000);
+      });
+
+      limparRotasMapaMotorista();
 
       alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}`);
 
       activeRideId = null;
       pendingRide = null;
-      limparRotasMapaMotorista();
 
       document.getElementById('driver-active-card').style.display = 'none';
       document.getElementById('driver-request-card').style.display = 'none';
@@ -516,6 +561,10 @@
     }
 
     function sairDaConta() {
+      if (currentUser && currentUser.role === 'motorista' && currentUser.plate) {
+        const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+        db.ref('motoristas/' + keyPlate).remove();
+      }
       location.reload();
     }
   </script>
