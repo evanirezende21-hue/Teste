@@ -136,11 +136,9 @@
     </div>
   </div>
 
-  <!-- BIBLIOTECAS Leaflet e Supabase -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- LÓGICA DO APLICATIVO -->
   <script>
     const SUPABASE_URL = 'https://snqzzrqwdnwpkejaijel.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_P26Wlq1JB1kdWX9dxlH2DA_g7JluoTg';
@@ -152,8 +150,7 @@
     let activeRideId = null;
     let pendingRide = null;
     let wakeLock = null;
-    let passengerSubscription = null;
-    let passengerIntervalCheck = null;
+    let intervalChecagemPassageiro = null;
 
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine;
@@ -479,9 +476,8 @@
         const resBusca = await fetch(urlBusca);
         const dataBusca = await resBusca.json();
 
-        if (pendingRide && dataBusca.routes && dataBusca.routes.length > 0) {
+        if (dataBusca.routes && dataBusca.routes.length > 0) {
           const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          if (dPickupRouteLine) driverMap.removeLayer(dPickupRouteLine);
           dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
         }
       } catch (e) {
@@ -544,57 +540,20 @@
         activeRideId = data[0].id;
         document.getElementById('ride-details').style.display = 'none';
         document.getElementById('status-box').style.display = 'block';
+        document.getElementById('status-box').style.color = '#d35400';
         document.getElementById('status-box').innerText = `⏳ Aguardando motorista aceitar... (Valor: R$ ${valorEstimado.toFixed(2).replace('.', ',')})`;
 
         escutarStatusCorridaPassageiro(activeRideId);
       } else {
         alert("Erro ao solicitar corrida. Tente novamente.");
-        console.error("Erro insert corrida:", error);
-      }
-    }
-
-    function processarMudancaStatusPassageiro(status, valor) {
-      const valorFormatado = (valor || valorEstimado || 0).toFixed(2).replace('.', ',');
-
-      if (status === 'aceita') {
-        document.getElementById('status-box').innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
-        document.getElementById('status-box').style.color = '#27ae60';
-      } else if (status === 'concluida') {
-        if (passengerIntervalCheck) clearInterval(passengerIntervalCheck);
-        alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
-        resetarEstadoPassageiro();
       }
     }
 
     function escutarStatusCorridaPassageiro(rideId) {
-      if (passengerSubscription) {
-        supabaseClient.removeChannel(passengerSubscription);
-      }
-      if (passengerIntervalCheck) {
-        clearInterval(passengerIntervalCheck);
-      }
+      if (intervalChecagemPassageiro) clearInterval(intervalChecagemPassageiro);
 
-      // 1. Inscrição Realtime via WebSockets (Geral para a tabela de corridas)
-      passengerSubscription = supabaseClient
-        .channel(`corrida-pass-${rideId}`)
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'corridas' 
-        }, (payload) => {
-          const dadosCorrida = payload.new || {};
-          if (dadosCorrida.id === rideId) {
-            processarMudancaStatusPassageiro(dadosCorrida.status, dadosCorrida.valor);
-          }
-        })
-        .subscribe();
-
-      // 2. Intervalo de Polling acelerado (Fallback a cada 1.5s)
-      passengerIntervalCheck = setInterval(async () => {
-        if (!activeRideId) {
-          clearInterval(passengerIntervalCheck);
-          return;
-        }
+      async function checarStatusDireto() {
+        if (!activeRideId) return;
 
         const { data, error } = await supabaseClient
           .from('corridas')
@@ -603,13 +562,38 @@
           .single();
 
         if (!error && data) {
-          processarMudancaStatusPassageiro(data.status, data.valor);
+          atualizarTelaPassageiroComStatus(data.status, data.valor);
         }
-      }, 1500);
+      }
+
+      checarStatusDireto();
+      intervalChecagemPassageiro = setInterval(checarStatusDireto, 2000);
+    }
+
+    function atualizarTelaPassageiroComStatus(status, valor) {
+      const valorFormatado = (valor || valorEstimado || 0).toFixed(2).replace('.', ',');
+
+      if (status === 'aceita') {
+        const box = document.getElementById('status-box');
+        if (box) {
+          box.innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
+          box.style.color = '#27ae60';
+        }
+      } else if (status === 'concluida') {
+        if (intervalChecagemPassageiro) {
+          clearInterval(intervalChecagemPassageiro);
+          intervalChecagemPassageiro = null;
+        }
+        alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
+        resetarEstadoPassageiro();
+      }
     }
 
     function resetarEstadoPassageiro() {
-      if (passengerIntervalCheck) clearInterval(passengerIntervalCheck);
+      if (intervalChecagemPassageiro) {
+        clearInterval(intervalChecagemPassageiro);
+        intervalChecagemPassageiro = null;
+      }
       activeRideId = null;
       destino = null;
       if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
@@ -682,12 +666,12 @@
 
         let bounds = L.latLngBounds([driverPos, pOrigemPassageiro, pDestinoPassageiro]);
 
-        if (pendingRide && dataBusca.routes && dataBusca.routes.length > 0) {
+        if (dataBusca.routes && dataBusca.routes.length > 0) {
           const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
         }
 
-        if (pendingRide && dataViagem.routes && dataViagem.routes.length > 0) {
+        if (dataViagem.routes && dataViagem.routes.length > 0) {
           const coordsViagem = dataViagem.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           dTripRouteLine = L.polyline(coordsViagem, { color: '#2980b9', weight: 6 }).addTo(driverMap);
         }
@@ -700,16 +684,14 @@
 
     async function confirmarAceiteCorrida() {
       if (!pendingRide) return;
-      
-      const { error } = await supabaseClient.from('corridas').update({ status: 'aceita' }).eq('id', pendingRide.id);
+      await supabaseClient.from('corridas').update({ status: 'aceita' }).eq('id', pendingRide.id);
+      activeRideId = pendingRide.id;
 
-      if (error) {
-        alert("Erro ao aceitar corrida. Verifique as permissões da tabela no Supabase.");
-        console.error("Erro update corrida:", error);
-        return;
+      if (dPickupRouteLine) {
+        driverMap.removeLayer(dPickupRouteLine);
+        dPickupRouteLine = null;
       }
 
-      activeRideId = pendingRide.id;
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
 
       document.getElementById('driver-request-card').style.display = 'none';
