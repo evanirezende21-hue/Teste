@@ -150,6 +150,7 @@
     let activeRideId = null;
     let pendingRide = null;
     let wakeLock = null;
+    let passengerSubscription = null;
 
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine;
@@ -475,8 +476,9 @@
         const resBusca = await fetch(urlBusca);
         const dataBusca = await resBusca.json();
 
-        if (dataBusca.routes && dataBusca.routes.length > 0) {
+        if (pendingRide && dataBusca.routes && dataBusca.routes.length > 0) {
           const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          if (dPickupRouteLine) driverMap.removeLayer(dPickupRouteLine);
           dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
         }
       } catch (e) {
@@ -546,7 +548,11 @@
     }
 
     function escutarStatusCorridaPassageiro(rideId) {
-      supabaseClient
+      if (passengerSubscription) {
+        supabaseClient.removeChannel(passengerSubscription);
+      }
+
+      passengerSubscription = supabaseClient
         .channel(`corrida-passageiro-${rideId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'corridas', filter: `id=eq.${rideId}` }, (payload) => {
           const dadosCorrida = payload.new || {};
@@ -574,7 +580,9 @@
       document.getElementById('instruction-text').style.display = 'block';
       document.getElementById('ride-details').style.display = 'none';
 
-      passengerMap.setView(origem, 16);
+      if (passengerMap && origem) {
+        passengerMap.setView(origem, 16);
+      }
     }
 
     function escutarCorridasMotorista() {
@@ -635,12 +643,12 @@
 
         let bounds = L.latLngBounds([driverPos, pOrigemPassageiro, pDestinoPassageiro]);
 
-        if (dataBusca.routes && dataBusca.routes.length > 0) {
+        if (pendingRide && dataBusca.routes && dataBusca.routes.length > 0) {
           const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
         }
 
-        if (dataViagem.routes && dataViagem.routes.length > 0) {
+        if (pendingRide && dataViagem.routes && dataViagem.routes.length > 0) {
           const coordsViagem = dataViagem.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           dTripRouteLine = L.polyline(coordsViagem, { color: '#2980b9', weight: 6 }).addTo(driverMap);
         }
