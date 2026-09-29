@@ -136,9 +136,11 @@
     </div>
   </div>
 
+  <!-- BIBLIOTECAS Leaflet e Supabase -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- LÓGICA DO APLICATIVO -->
   <script>
     const SUPABASE_URL = 'https://snqzzrqwdnwpkejaijel.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_P26Wlq1JB1kdWX9dxlH2DA_g7JluoTg';
@@ -554,20 +556,48 @@
 
       passengerSubscription = supabaseClient
         .channel(`corrida-passageiro-${rideId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'corridas', filter: `id=eq.${rideId}` }, (payload) => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'corridas' }, (payload) => {
           const dadosCorrida = payload.new || {};
-          const status = dadosCorrida.status;
-          const valorFormatado = (dadosCorrida.valor || valorEstimado || 0).toFixed(2).replace('.', ',');
-          
-          if (status === 'aceita') {
-            document.getElementById('status-box').innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
-            document.getElementById('status-box').style.color = '#27ae60';
-          } else if (status === 'concluida') {
-            alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
-            resetarEstadoPassageiro();
+          if (dadosCorrida.id === rideId) {
+            const status = dadosCorrida.status;
+            const valorFormatado = (dadosCorrida.valor || valorEstimado || 0).toFixed(2).replace('.', ',');
+            
+            if (status === 'aceita') {
+              document.getElementById('status-box').innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
+              document.getElementById('status-box').style.color = '#27ae60';
+            } else if (status === 'concluida') {
+              alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
+              resetarEstadoPassageiro();
+            }
           }
         })
         .subscribe();
+
+      const intervalCheck = setInterval(async () => {
+        if (!activeRideId) {
+          clearInterval(intervalCheck);
+          return;
+        }
+
+        const { data } = await supabaseClient
+          .from('corridas')
+          .select('status, valor')
+          .eq('id', rideId)
+          .single();
+
+        if (data) {
+          const valorFormatado = (data.valor || valorEstimado || 0).toFixed(2).replace('.', ',');
+
+          if (data.status === 'aceita') {
+            document.getElementById('status-box').innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
+            document.getElementById('status-box').style.color = '#27ae60';
+          } else if (data.status === 'concluida') {
+            clearInterval(intervalCheck);
+            alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
+            resetarEstadoPassageiro();
+          }
+        }
+      }, 3000);
     }
 
     function resetarEstadoPassageiro() {
