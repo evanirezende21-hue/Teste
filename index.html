@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Moto Táxi SJN - Firebase</title>
 
   <!-- Leaflet CSS -->
@@ -10,7 +10,7 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    html, body { height: 100%; width: 100%; overflow: hidden; background: #212121; }
+    body, html { height: 100%; width: 100%; overflow: hidden; background: #f5f5f5; }
     
     .screen { display: none; height: 100%; width: 100%; position: relative; }
     .screen.active { display: flex; flex-direction: column; }
@@ -26,41 +26,13 @@
     .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #333; color: #fff; font-size: 14px; outline: none; }
     .form-group input:focus { border-color: #ffc107; }
 
-    /* HEADER FLUTUANTE SOBRE O MAPA */
-    header { 
-      position: absolute; 
-      top: 0; 
-      left: 0; 
-      right: 0; 
-      background: rgba(33, 33, 33, 0.95); 
-      color: #ffc107; 
-      padding: 12px 16px; 
-      font-weight: bold; 
-      font-size: 15px; 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3); 
-      z-index: 1000; 
-      backdrop-filter: blur(5px);
-    }
-    header .user-badge { font-size: 12px; background: rgba(255,255,255,0.1); color: #fff; padding: 4px 8px; border-radius: 12px; margin-top: 2px; }
-    header button { background: #ffc107; color: #000; border: none; padding: 8px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; }
+    header { background: #ffc107; color: #000; padding: 14px 16px; font-weight: bold; font-size: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 1000; }
+    header .user-badge { font-size: 12px; background: rgba(0,0,0,0.1); padding: 4px 8px; border-radius: 12px; margin-top: 2px; }
+    header button { background: #000; color: #ffc107; border: none; padding: 8px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; }
 
-    /* CONTAINER DO MAPA EM TELA CHEIA */
-    .map-container { 
-      position: absolute; 
-      top: 0; 
-      bottom: 0; 
-      left: 0; 
-      right: 0; 
-      width: 100%; 
-      height: 100%; 
-      z-index: 1; 
-      background: #e5e3df;
-    }
+    .map-container { flex: 1; width: 100%; height: 100%; z-index: 1; }
 
-    .bottom-card { position: absolute; bottom: 20px; left: 16px; right: 16px; background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); z-index: 1000; }
+    .bottom-card { position: absolute; bottom: 20px; left: 16px; right: 16px; background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; }
     .price-tag { font-size: 26px; font-weight: bold; color: #2e7d32; }
     .info-text { font-size: 14px; color: #555; margin-bottom: 8px; }
 
@@ -103,12 +75,12 @@
 
   <!-- PASSAGEIRO -->
   <div id="passenger-screen" class="screen">
-    <header style="background: rgba(255,193,7,0.95); color: #000;">
+    <header>
       <div>
         <span>Passageiro</span>
-        <div class="user-badge" id="passenger-badge" style="background: rgba(0,0,0,0.15); color: #000;">Nome</div>
+        <div class="user-badge" id="passenger-badge">Nome</div>
       </div>
-      <button onclick="sairDaConta()" style="background: #000; color: #ffc107;">Sair / Trocar Perfil</button>
+      <button onclick="sairDaConta()">Sair / Trocar Perfil</button>
     </header>
 
     <div id="passenger-map" class="map-container"></div>
@@ -131,12 +103,12 @@
 
   <!-- MOTORISTA -->
   <div id="driver-screen" class="screen">
-    <header>
+    <header style="background: #212121; color: #ffc107;">
       <div>
         <span>Painel do Motorista</span>
-        <div class="user-badge" id="driver-badge">Nome (Placa)</div>
+        <div class="user-badge" id="driver-badge" style="color: #aaa;">Nome (Placa)</div>
       </div>
-      <button onclick="sairDaConta()">Sair / Trocar Perfil</button>
+      <button onclick="sairDaConta()" style="background: #ffc107; color: #000;">Sair / Trocar Perfil</button>
     </header>
 
     <div id="driver-map" class="map-container"></div>
@@ -223,6 +195,7 @@
       popupAnchor: [0, -18]
     });
 
+    // MANTÉM A TELA DO TELEMÓVEL SEMPRE ACESA
     async function manterTelaAcesa() {
       try {
         if ('wakeLock' in navigator) {
@@ -268,7 +241,7 @@
         setTimeout(() => {
           initPassengerMap();
           carregarEExibirMotoristasNoMapa();
-        }, 150);
+        }, 100);
 
       } else {
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
@@ -281,18 +254,18 @@
           salvarEAtivarGPSMotorista();
           carregarEExibirPassageirosNoMapaMotorista();
           escutarCorridasMotorista();
-        }, 150);
+        }, 100);
       }
     }
 
     function initPassengerMap() {
       if (!passengerMap) {
-        passengerMap = L.map('passenger-map', { zoomControl: false }).setView(origem, 16);
+        passengerMap = L.map('passenger-map').setView(origem, 16);
         L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(passengerMap);
         pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
+      } else {
+        passengerMap.invalidateSize();
       }
-      
-      passengerMap.invalidateSize();
 
       const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
       const passengerRef = db.ref('passageiros/' + keyPhone);
@@ -355,12 +328,12 @@
 
     function initDriverMapBase() {
       if (!driverMap) {
-        driverMap = L.map('driver-map', { zoomControl: false }).setView(driverPos, 16);
+        driverMap = L.map('driver-map').setView(driverPos, 16);
         L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(driverMap);
         dSelfMarker = L.marker(driverPos, { icon: motoIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`).openPopup();
+      } else {
+        driverMap.invalidateSize();
       }
-      
-      driverMap.invalidateSize();
     }
 
     function salvarEAtivarGPSMotorista() {
@@ -373,7 +346,6 @@
         navigator.geolocation.watchPosition((pos) => {
           driverPos = [pos.coords.latitude, pos.coords.longitude];
           if (dSelfMarker) dSelfMarker.setLatLng(driverPos);
-          if (driverMap) driverMap.invalidateSize();
 
           driverRef.set({
             nome: currentUser.name,
@@ -384,6 +356,7 @@
             updatedAt: Date.now()
           });
 
+          // Se tiver uma corrida ativa ou pendente, redesenha a rota em tempo real a partir da posição ATUAL do motorista
           if (pendingRide) {
             let pontoDestino = [pendingRide.origem_lat, pendingRide.origem_lng];
             if (activeRideId && pendingRide.id === activeRideId) {
@@ -457,6 +430,7 @@
           const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           if (pRouteLine) passengerMap.removeLayer(pRouteLine);
           
+          // ROTA TRACEJADA NA TELA DO PASSAGEIRO
           pRouteLine = L.polyline(coordinates, { 
             color: '#007bff', 
             weight: 5,
@@ -568,6 +542,7 @@
       if (dTripRouteLine) { driverMap.removeLayer(dTripRouteLine); dTripRouteLine = null; }
     }
 
+    // DESENHA A ROTA TRACEJADA DINÂMICA
     async function atualizarRotaEmAndamentoMotorista(pPosicaoAtualMotorista, pDestinoFinal) {
       const urlViagem = `https://router.project-osrm.org/route/v1/driving/${pPosicaoAtualMotorista[1]},${pPosicaoAtualMotorista[0]};${pDestinoFinal[1]},${pDestinoFinal[0]}?overview=full&geometries=geojson`;
 
@@ -582,10 +557,11 @@
             driverMap.removeLayer(dTripRouteLine);
           }
 
+          // LINHA TRACEJADA/PONTILHADA QUE ENCURTA CONFORME O MOTORISTA AVANÇA
           dTripRouteLine = L.polyline(coordsViagem, { 
             color: '#2980b9', 
             weight: 6,
-            dashArray: '10, 10',
+            dashArray: '10, 10', // CRIA A LINHA TRACEJADA VISÍVEL
             opacity: 0.9 
           }).addTo(driverMap);
         }
@@ -600,6 +576,7 @@
       dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Embarque Passageiro</b>");
       dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon }).addTo(driverMap).bindPopup("<b>Destino Final</b>");
 
+      // Desenha rota dinâmica inicial a partir de onde o motorista está agora
       await atualizarRotaEmAndamentoMotorista(driverPos, pOrigemPassageiro);
       
       if (dTripRouteLine) {
@@ -613,6 +590,7 @@
 
       db.ref('corridas/' + activeRideId).update({ status: 'aceita' });
 
+      // Atualiza rota do motorista direto para o destino final do cliente
       atualizarRotaEmAndamentoMotorista(driverPos, [pendingRide.destino_lat, pendingRide.destino_lng]);
 
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
@@ -664,12 +642,6 @@
       }
       location.reload();
     }
-
-    // REDIMENSIONA O MAPA AUTOMATICAMENTE AO GIRAR OU MUDAR TAMANHO DA TELA
-    window.addEventListener('resize', () => {
-      if (passengerMap) passengerMap.invalidateSize();
-      if (driverMap) driverMap.invalidateSize();
-    });
   </script>
 </body>
 </html>
