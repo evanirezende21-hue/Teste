@@ -247,13 +247,18 @@
         passengerMap.invalidateSize();
       }
 
+      const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+      const passengerRef = db.ref('passageiros/' + keyPhone);
+
+      // DESCONEXÃO AUTOMÁTICA: REMOVE O PASSAGEIRO AO FECHAR O APP / ABA
+      passengerRef.onDisconnect().remove();
+
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
           origem = [pos.coords.latitude, pos.coords.longitude];
           if (pUserMarker) pUserMarker.setLatLng(origem);
           
-          const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
-          db.ref('passageiros/' + keyPhone).set({
+          passengerRef.set({
             nome: currentUser.name,
             telefone: currentUser.phone,
             lat: origem[0],
@@ -339,21 +344,32 @@
       }
     }
 
+    // EXIBE PASSAGEIROS NO MAPA DO MOTORISTA (FILTRA PASSAGEIROS ATIVOS/RECENTES)
     function carregarEExibirPassageirosNoMapaMotorista() {
       db.ref('passageiros').on('value', (snapshot) => {
         const data = snapshot.val() || {};
         if (!driverMap) return;
 
+        const agora = Date.now();
+        const UM_MINUTO = 60 * 1000;
+
+        // Limpa do mapa passageiros removidos ou inativos
         Object.keys(passengerMarkers).forEach(key => {
-          if (!data[key]) {
+          const p = data[key];
+          const isOffline = !p || !p.updatedAt || (agora - p.updatedAt > UM_MINUTO);
+
+          if (isOffline) {
             driverMap.removeLayer(passengerMarkers[key]);
             delete passengerMarkers[key];
           }
         });
 
+        // Adiciona/Atualiza marcadores para passageiros conectados
         Object.keys(data).forEach(key => {
           const p = data[key];
-          if (p.lat && p.lng) {
+          const isOnline = p && p.updatedAt && (agora - p.updatedAt <= UM_MINUTO);
+
+          if (isOnline && p.lat && p.lng) {
             if (passengerMarkers[key]) {
               passengerMarkers[key].setLatLng([p.lat, p.lng]);
             } else {
@@ -561,9 +577,14 @@
     }
 
     function sairDaConta() {
-      if (currentUser && currentUser.role === 'motorista' && currentUser.plate) {
-        const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
-        db.ref('motoristas/' + keyPlate).remove();
+      if (currentUser) {
+        if (currentUser.role === 'motorista' && currentUser.plate) {
+          const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+          db.ref('motoristas/' + keyPlate).remove();
+        } else if (currentUser.role === 'passageiro' && currentUser.phone) {
+          const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+          db.ref('passageiros/' + keyPhone).remove();
+        }
       }
       location.reload();
     }
