@@ -146,13 +146,13 @@
   <script>
     // CONFIGURAÇÃO DO SEU PROJETO NO FIREBASE
     const firebaseConfig = {
-      apiKey: "AIzaSyCHZvFu6YPrrLB-ssTJ2gES_QaQASLVy9M", // ⚠️ Substitua pela sua apiKey do Firebase
+      apiKey: "COLE_SUA_API_KEY_AQUI", // ⚠️ Substitua pela sua apiKey do Firebase
       authDomain: "moto-taxi-sjn-d9b71.firebaseapp.com",
       databaseURL: "https://moto-taxi-sjn-d9b71-default-rtdb.firebaseio.com",
       projectId: "moto-taxi-sjn-d9b71",
       storageBucket: "moto-taxi-sjn-d9b71.appspot.com",
       messagingSenderId: "13246123116",
-      appId: "1:13246123116:web:85941b49c4f5528ca05c49" // ⚠️ Substitua pelo seu appId do Firebase
+      appId: "COLE_SEU_APP_ID_AQUI" // ⚠️ Substitua pelo seu appId do Firebase
     };
 
     // Inicializa o Firebase
@@ -345,7 +345,15 @@
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
           driverPos = [pos.coords.latitude, pos.coords.longitude];
-          if (dSelfMarker) dSelfMarker.setLatLng(driverPos);
+          
+          if (dSelfMarker) {
+            dSelfMarker.setLatLng(driverPos);
+          }
+
+          // CENTRALIZA O MAPA NO MOTORISTA CONFORME ELE SE DESLOCA
+          if (driverMap) {
+            driverMap.panTo(driverPos, { animate: true, duration: 0.5 });
+          }
 
           driverRef.set({
             nome: currentUser.name,
@@ -356,7 +364,7 @@
             updatedAt: Date.now()
           });
 
-          // Se tiver uma corrida ativa ou pendente, redesenha a rota em tempo real a partir da posição ATUAL do motorista
+          // Se houver corrida em andamento, atualiza a rota a partir da nova posição
           if (pendingRide) {
             let pontoDestino = [pendingRide.origem_lat, pendingRide.origem_lng];
             if (activeRideId && pendingRide.id === activeRideId) {
@@ -430,7 +438,6 @@
           const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           if (pRouteLine) passengerMap.removeLayer(pRouteLine);
           
-          // ROTA TRACEJADA NA TELA DO PASSAGEIRO
           pRouteLine = L.polyline(coordinates, { 
             color: '#007bff', 
             weight: 5,
@@ -542,7 +549,6 @@
       if (dTripRouteLine) { driverMap.removeLayer(dTripRouteLine); dTripRouteLine = null; }
     }
 
-    // DESENHA A ROTA TRACEJADA DINÂMICA
     async function atualizarRotaEmAndamentoMotorista(pPosicaoAtualMotorista, pDestinoFinal) {
       const urlViagem = `https://router.project-osrm.org/route/v1/driving/${pPosicaoAtualMotorista[1]},${pPosicaoAtualMotorista[0]};${pDestinoFinal[1]},${pDestinoFinal[0]}?overview=full&geometries=geojson`;
 
@@ -557,11 +563,10 @@
             driverMap.removeLayer(dTripRouteLine);
           }
 
-          // LINHA TRACEJADA/PONTILHADA QUE ENCURTA CONFORME O MOTORISTA AVANÇA
           dTripRouteLine = L.polyline(coordsViagem, { 
             color: '#2980b9', 
             weight: 6,
-            dashArray: '10, 10', // CRIA A LINHA TRACEJADA VISÍVEL
+            dashArray: '10, 10', 
             opacity: 0.9 
           }).addTo(driverMap);
         }
@@ -576,12 +581,7 @@
       dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Embarque Passageiro</b>");
       dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon }).addTo(driverMap).bindPopup("<b>Destino Final</b>");
 
-      // Desenha rota dinâmica inicial a partir de onde o motorista está agora
       await atualizarRotaEmAndamentoMotorista(driverPos, pOrigemPassageiro);
-      
-      if (dTripRouteLine) {
-        driverMap.fitBounds(L.featureGroup([dSelfMarker, dOrigMarker, dDestMarker]).getBounds(), { padding: [50, 50] });
-      }
     }
 
     function confirmarAceiteCorrida() {
@@ -590,7 +590,6 @@
 
       db.ref('corridas/' + activeRideId).update({ status: 'aceita' });
 
-      // Atualiza rota do motorista direto para o destino final do cliente
       atualizarRotaEmAndamentoMotorista(driverPos, [pendingRide.destino_lat, pendingRide.destino_lng]);
 
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
