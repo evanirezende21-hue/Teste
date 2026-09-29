@@ -153,6 +153,7 @@
     let pendingRide = null;
     let wakeLock = null;
     let passengerSubscription = null;
+    let passengerIntervalCheck = null;
 
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine;
@@ -546,6 +547,22 @@
         document.getElementById('status-box').innerText = `⏳ Aguardando motorista aceitar... (Valor: R$ ${valorEstimado.toFixed(2).replace('.', ',')})`;
 
         escutarStatusCorridaPassageiro(activeRideId);
+      } else {
+        alert("Erro ao solicitar corrida. Tente novamente.");
+        console.error("Erro insert corrida:", error);
+      }
+    }
+
+    function processarMudancaStatusPassageiro(status, valor) {
+      const valorFormatado = (valor || valorEstimado || 0).toFixed(2).replace('.', ',');
+
+      if (status === 'aceita') {
+        document.getElementById('status-box').innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
+        document.getElementById('status-box').style.color = '#27ae60';
+      } else if (status === 'concluida') {
+        if (passengerIntervalCheck) clearInterval(passengerIntervalCheck);
+        alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
+        resetarEstadoPassageiro();
       }
     }
 
@@ -553,54 +570,46 @@
       if (passengerSubscription) {
         supabaseClient.removeChannel(passengerSubscription);
       }
+      if (passengerIntervalCheck) {
+        clearInterval(passengerIntervalCheck);
+      }
 
+      // 1. Inscrição Realtime via WebSockets (Geral para a tabela de corridas)
       passengerSubscription = supabaseClient
-        .channel(`corrida-passageiro-${rideId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'corridas' }, (payload) => {
+        .channel(`corrida-pass-${rideId}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'corridas' 
+        }, (payload) => {
           const dadosCorrida = payload.new || {};
           if (dadosCorrida.id === rideId) {
-            const status = dadosCorrida.status;
-            const valorFormatado = (dadosCorrida.valor || valorEstimado || 0).toFixed(2).replace('.', ',');
-            
-            if (status === 'aceita') {
-              document.getElementById('status-box').innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
-              document.getElementById('status-box').style.color = '#27ae60';
-            } else if (status === 'concluida') {
-              alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
-              resetarEstadoPassageiro();
-            }
+            processarMudancaStatusPassageiro(dadosCorrida.status, dadosCorrida.valor);
           }
         })
         .subscribe();
 
-      const intervalCheck = setInterval(async () => {
+      // 2. Intervalo de Polling acelerado (Fallback a cada 1.5s)
+      passengerIntervalCheck = setInterval(async () => {
         if (!activeRideId) {
-          clearInterval(intervalCheck);
+          clearInterval(passengerIntervalCheck);
           return;
         }
 
-        const { data } = await supabaseClient
+        const { data, error } = await supabaseClient
           .from('corridas')
           .select('status, valor')
           .eq('id', rideId)
           .single();
 
-        if (data) {
-          const valorFormatado = (data.valor || valorEstimado || 0).toFixed(2).replace('.', ',');
-
-          if (data.status === 'aceita') {
-            document.getElementById('status-box').innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
-            document.getElementById('status-box').style.color = '#27ae60';
-          } else if (data.status === 'concluida') {
-            clearInterval(intervalCheck);
-            alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
-            resetarEstadoPassageiro();
-          }
+        if (!error && data) {
+          processarMudancaStatusPassageiro(data.status, data.valor);
         }
-      }, 3000);
+      }, 1500);
     }
 
     function resetarEstadoPassageiro() {
+      if (passengerIntervalCheck) clearInterval(passengerIntervalCheck);
       activeRideId = null;
       destino = null;
       if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
@@ -691,9 +700,16 @@
 
     async function confirmarAceiteCorrida() {
       if (!pendingRide) return;
-      await supabaseClient.from('corridas').update({ status: 'aceita' }).eq('id', pendingRide.id);
-      activeRideId = pendingRide.id;
+      
+      const { error } = await supabaseClient.from('corridas').update({ status: 'aceita' }).eq('id', pendingRide.id);
 
+      if (error) {
+        alert("Erro ao aceitar corrida. Verifique as permissões da tabela no Supabase.");
+        console.error("Erro update corrida:", error);
+        return;
+      }
+
+      activeRideId = pendingRide.id;
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
 
       document.getElementById('driver-request-card').style.display = 'none';
