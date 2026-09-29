@@ -146,13 +146,13 @@
   <script>
     // CONFIGURAÇÃO DO SEU PROJETO NO FIREBASE
     const firebaseConfig = {
-      apiKey: "COLE_SUA_API_KEY_AQUI", // ⚠️ Substitua pela sua apiKey do Firebase
+      apiKey: "AIzaSyCHZvFu6YPrrLB-ssTJ2gES_QaQASLVy9M", // ⚠️ Substitua pela sua apiKey do Firebase
       authDomain: "moto-taxi-sjn-d9b71.firebaseapp.com",
       databaseURL: "https://moto-taxi-sjn-d9b71-default-rtdb.firebaseio.com",
       projectId: "moto-taxi-sjn-d9b71",
       storageBucket: "moto-taxi-sjn-d9b71.appspot.com",
       messagingSenderId: "13246123116",
-      appId: "COLE_SEU_APP_ID_AQUI" // ⚠️ Substitua pelo seu appId do Firebase
+      appId: "1:13246123116:web:85941b49c4f5528ca05c49" // ⚠️ Substitua pelo seu appId do Firebase
     };
 
     // Inicializa o Firebase
@@ -206,7 +206,6 @@
       }
     }
 
-    // Reativa o bloqueio se o motorista voltar para o aplicativo
     document.addEventListener('visibilitychange', async () => {
       if (wakeLock !== null && document.visibilityState === 'visible' && currentUser && currentUser.role === 'motorista') {
         await manterTelaAcesa();
@@ -248,7 +247,6 @@
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
         
-        // Impede que a tela do telemóvel apague no modo motorista
         manterTelaAcesa();
 
         setTimeout(() => {
@@ -357,6 +355,15 @@
             online: true,
             updatedAt: Date.now()
           });
+
+          // Se tiver uma corrida ativa ou pendente, redesenha a rota em tempo real a partir da posição ATUAL do motorista
+          if (pendingRide) {
+            let pontoDestino = [pendingRide.origem_lat, pendingRide.origem_lng];
+            if (activeRideId && pendingRide.id === activeRideId) {
+              pontoDestino = [pendingRide.destino_lat, pendingRide.destino_lng];
+            }
+            atualizarRotaEmAndamentoMotorista(driverPos, pontoDestino);
+          }
         }, null, { enableHighAccuracy: true });
       }
     }
@@ -422,7 +429,13 @@
 
           const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           if (pRouteLine) passengerMap.removeLayer(pRouteLine);
-          pRouteLine = L.polyline(coordinates, { color: '#007bff', weight: 5 }).addTo(passengerMap);
+          
+          // ROTA TRACEJADA NA TELA DO PASSAGEIRO
+          pRouteLine = L.polyline(coordinates, { 
+            color: '#007bff', 
+            weight: 5,
+            dashArray: '8, 8' 
+          }).addTo(passengerMap);
           passengerMap.fitBounds(pRouteLine.getBounds(), { padding: [40, 40] });
         }
       } catch (error) {
@@ -529,13 +542,9 @@
       if (dTripRouteLine) { driverMap.removeLayer(dTripRouteLine); dTripRouteLine = null; }
     }
 
-    async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
-      limparRotasMapaMotorista();
-
-      dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Passageiro Esperando Aqui</b>");
-      dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon }).addTo(driverMap).bindPopup("<b>Destino do Passageiro</b>");
-
-      const urlViagem = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
+    // DESENHA A ROTA TRACEJADA DINÂMICA
+    async function atualizarRotaEmAndamentoMotorista(pPosicaoAtualMotorista, pDestinoFinal) {
+      const urlViagem = `https://router.project-osrm.org/route/v1/driving/${pPosicaoAtualMotorista[1]},${pPosicaoAtualMotorista[0]};${pDestinoFinal[1]},${pDestinoFinal[0]}?overview=full&geometries=geojson`;
 
       try {
         const resViagem = await fetch(urlViagem);
@@ -543,11 +552,35 @@
 
         if (dataViagem.routes && dataViagem.routes.length > 0) {
           const coordsViagem = dataViagem.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          dTripRouteLine = L.polyline(coordsViagem, { color: '#2980b9', weight: 6 }).addTo(driverMap);
-          driverMap.fitBounds(dTripRouteLine.getBounds(), { padding: [50, 50] });
+
+          if (dTripRouteLine) {
+            driverMap.removeLayer(dTripRouteLine);
+          }
+
+          // LINHA TRACEJADA/PONTILHADA QUE ENCURTA CONFORME O MOTORISTA AVANÇA
+          dTripRouteLine = L.polyline(coordsViagem, { 
+            color: '#2980b9', 
+            weight: 6,
+            dashArray: '10, 10', // CRIA A LINHA TRACEJADA VISÍVEL
+            opacity: 0.9 
+          }).addTo(driverMap);
         }
       } catch (e) {
-        console.error("Erro ao desenhar rotas:", e);
+        console.error("Erro ao recalcular rota:", e);
+      }
+    }
+
+    async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
+      limparRotasMapaMotorista();
+
+      dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Embarque Passageiro</b>");
+      dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon }).addTo(driverMap).bindPopup("<b>Destino Final</b>");
+
+      // Desenha rota dinâmica inicial a partir de onde o motorista está agora
+      await atualizarRotaEmAndamentoMotorista(driverPos, pOrigemPassageiro);
+      
+      if (dTripRouteLine) {
+        driverMap.fitBounds(L.featureGroup([dSelfMarker, dOrigMarker, dDestMarker]).getBounds(), { padding: [50, 50] });
       }
     }
 
@@ -556,6 +589,9 @@
       activeRideId = pendingRide.id;
 
       db.ref('corridas/' + activeRideId).update({ status: 'aceita' });
+
+      // Atualiza rota do motorista direto para o destino final do cliente
+      atualizarRotaEmAndamentoMotorista(driverPos, [pendingRide.destino_lat, pendingRide.destino_lng]);
 
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
       document.getElementById('driver-request-card').style.display = 'none';
