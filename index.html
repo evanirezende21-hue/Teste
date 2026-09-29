@@ -270,7 +270,17 @@
     function carregarEExibirMotoristasNoMapa() {
       db.ref('motoristas').on('value', (snapshot) => {
         const data = snapshot.val();
-        if (!data || !passengerMap) return;
+        if (!passengerMap) return;
+
+        // Limpa motoristas que saíram
+        Object.keys(driverMarkers).forEach(placa => {
+          if (!data || !data[placa]) {
+            passengerMap.removeLayer(driverMarkers[placa]);
+            delete driverMarkers[placa];
+          }
+        });
+
+        if (!data) return;
 
         Object.keys(data).forEach(placa => {
           const m = data[placa];
@@ -320,7 +330,7 @@
         const data = snapshot.val() || {};
         if (!driverMap) return;
 
-        // Limpa marcadores de passageiros que não existem mais no Firebase
+        // Limpa do mapa passageiros que foram apagados do banco de dados
         Object.keys(passengerMarkers).forEach(key => {
           if (!data[key]) {
             driverMap.removeLayer(passengerMarkers[key]);
@@ -422,7 +432,6 @@
     }
 
     function resetarEstadoPassageiro() {
-      // Remove o passageiro do banco ao finalizar para sumir do mapa
       if (currentUser && currentUser.phone) {
         const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
         db.ref('passageiros/' + keyPhone).remove();
@@ -441,7 +450,7 @@
     function escutarCorridasMotorista() {
       db.ref('corridas').on('value', (snapshot) => {
         const data = snapshot.val();
-        if (activeRideId) return;
+        if (activeRideId) return; // Se já está em corrida, ignora novas
 
         let corridaEncontrada = null;
         if (data) {
@@ -473,9 +482,18 @@
     }
 
     function limparRotasMapaMotorista() {
-      if (dOrigMarker) { driverMap.removeLayer(dOrigMarker); dOrigMarker = null; }
-      if (dDestMarker) { driverMap.removeLayer(dDestMarker); dDestMarker = null; }
-      if (dTripRouteLine) { driverMap.removeLayer(dTripRouteLine); dTripRouteLine = null; }
+      if (dOrigMarker) { 
+        driverMap.removeLayer(dOrigMarker); 
+        dOrigMarker = null; 
+      }
+      if (dDestMarker) { 
+        driverMap.removeLayer(dDestMarker); 
+        dDestMarker = null; 
+      }
+      if (dTripRouteLine) { 
+        driverMap.removeLayer(dTripRouteLine); 
+        dTripRouteLine = null; 
+      }
     }
 
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
@@ -506,8 +524,6 @@
 
       db.ref('corridas/' + activeRideId).update({ status: 'aceita' });
 
-      limparRotasMapaMotorista();
-
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
@@ -520,19 +536,24 @@
 
       const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
 
-      // Atualiza status no banco de dados
-      db.ref('corridas/' + activeRideId).update({ status: 'concluida' });
-
-      // Apaga o passageiro do banco para sumir do mapa do motorista imediatamente
+      // 1. Apaga os dados do passageiro do banco de dados para sumir com o ponto azul
       if (pendingRide && pendingRide.passageiroKey) {
         db.ref('passageiros/' + pendingRide.passageiroKey).remove();
       }
+
+      // 2. Atualiza status no banco e em seguida remove a corrida concluída
+      const rideRef = db.ref('corridas/' + activeRideId);
+      rideRef.update({ status: 'concluida' }).then(() => {
+        setTimeout(() => rideRef.remove(), 2000); // Remove o registro do banco após a notificação ao passageiro
+      });
+
+      // 3. Limpa IMEDIATAMENTE a rota, o ponto de origem e o ponto de destino do mapa do motorista
+      limparRotasMapaMotorista();
 
       alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}`);
 
       activeRideId = null;
       pendingRide = null;
-      limparRotasMapaMotorista();
 
       document.getElementById('driver-active-card').style.display = 'none';
       document.getElementById('driver-request-card').style.display = 'none';
