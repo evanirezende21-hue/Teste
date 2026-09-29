@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Moto Táxi SJN</title>
+  <title>Moto Táxi SJN - Firebase</title>
 
-  <!-- CSS do Leaflet -->
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
@@ -136,27 +136,40 @@
     </div>
   </div>
 
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Firebase App & Realtime Database SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
   <script>
-    const SUPABASE_URL = 'https://snqzzrqwdnwpkejaijel.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_P26Wlq1JB1kdWX9dxlH2DA_g7JluoTg';
-    
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ⚠️ SUBSTITUA PELAS SUAS CHAVES DO FIREBASE
+    const firebaseConfig = {
+      apiKey: "SUA_API_KEY",
+      authDomain: "SEU_PROJETO.firebaseapp.com",
+      databaseURL: "https://SEU_PROJETO-default-rtdb.firebaseio.com",
+      projectId: "SEU_PROJETO",
+      storageBucket: "SEU_PROJETO.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef123456"
+    };
+
+    // Inicializa o Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     let currentRole = 'passageiro';
     let currentUser = null;
     let activeRideId = null;
     let pendingRide = null;
     let wakeLock = null;
-    let intervalChecagemPassageiro = null;
 
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine;
     let dSelfMarker, dOrigMarker, dDestMarker;
     let dPickupRouteLine, dTripRouteLine;
-    
+
     let driverMarkers = {}; 
     let passengerMarkers = {};
 
@@ -190,64 +203,6 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    async function manterTelaAcesa() {
-      try {
-        if ('wakeLock' in navigator) {
-          wakeLock = await navigator.wakeLock.request('screen');
-          
-          document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-              wakeLock = await navigator.wakeLock.request('screen');
-            }
-          });
-        }
-      } catch (err) {
-        console.log(`Erro ao manter tela acesa: ${err.name}, ${err.message}`);
-      }
-    }
-
-    function tocarAlertaSonoro() {
-      try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContext) return;
-        const ctx = new AudioContext();
-
-        const tocarBip = (freq, tempoInicio, duracao) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime + tempoInicio);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + tempoInicio + duracao);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(ctx.currentTime + tempoInicio);
-          osc.stop(ctx.currentTime + tempoInicio + duracao);
-        };
-
-        tocarBip(880, 0, 0.2);
-        tocarBip(1100, 0.25, 0.2);
-        tocarBip(1320, 0.5, 0.3);
-      } catch (e) {
-        console.error("Erro ao reproduzir alerta sonoro:", e);
-      }
-    }
-
-    function notificarNovaSolicitacao(valor, passageiro) {
-      tocarAlertaSonoro();
-
-      if (navigator.vibrate) {
-        navigator.vibrate([300, 150, 300, 150, 400]);
-      }
-
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('🚨 Nova Corrida - Moto Táxi SJN', {
-          body: `Valor: R$ ${valor} | Passageiro: ${passageiro}`,
-          icon: motoSvg
-        });
-      }
-    }
-
     async function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
       const phone = document.getElementById('user-phone').value.trim();
@@ -275,12 +230,6 @@
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
         
-        if ('Notification' in window) {
-          Notification.requestPermission();
-        }
-
-        manterTelaAcesa();
-        
         setTimeout(() => {
           initDriverMapBase();
           salvarEAtivarGPSMotorista();
@@ -290,17 +239,6 @@
       }
     }
 
-    async function atualizarPosicaoPassageiroNoBanco(lat, lng) {
-      if (!currentUser || currentUser.role !== 'passageiro') return;
-      await supabaseClient.from('passageiros').upsert([{ 
-        nome: currentUser.name, 
-        telefone: currentUser.phone, 
-        lat: lat, 
-        lng: lng,
-        atualizado_em: new Date().toISOString()
-      }], { onConflict: 'telefone' });
-    }
-
     function initPassengerMap() {
       if (!passengerMap) {
         passengerMap = L.map('passenger-map').setView(origem, 16);
@@ -308,20 +246,22 @@
         pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
       } else {
         passengerMap.invalidateSize();
-        passengerMap.setView(origem, 16);
       }
-
-      atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
 
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
           origem = [pos.coords.latitude, pos.coords.longitude];
-          if (pUserMarker) {
-            pUserMarker.setLatLng(origem);
-          } else if (passengerMap) {
-            pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
-          }
-          atualizarPosicaoPassageiroNoBanco(origem[0], origem[1]);
+          if (pUserMarker) pUserMarker.setLatLng(origem);
+          
+          // Salva posição no Firebase
+          const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+          db.ref('passageiros/' + keyPhone).set({
+            nome: currentUser.name,
+            telefone: currentUser.phone,
+            lat: origem[0],
+            lng: origem[1],
+            updatedAt: Date.now()
+          });
         }, null, { enableHighAccuracy: true });
       }
 
@@ -329,86 +269,24 @@
       passengerMap.on('click', onPassengerMapClick);
     }
 
-    async function carregarEExibirMotoristasNoMapa() {
-      async function atualizarMotos() {
-        const { data, error } = await supabaseClient.from('motoristas').select('*');
-        if (!error && data && passengerMap) {
-          const placasAtivas = data.map(m => m.placa);
-          
-          Object.keys(driverMarkers).forEach(placa => {
-            if (!placasAtivas.includes(placa)) {
-              passengerMap.removeLayer(driverMarkers[placa]);
-              delete driverMarkers[placa];
+    function carregarEExibirMotoristasNoMapa() {
+      db.ref('motoristas').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (!data || !passengerMap) return;
+
+        Object.keys(data).forEach(placa => {
+          const m = data[placa];
+          if (m.lat && m.lng) {
+            if (driverMarkers[placa]) {
+              driverMarkers[placa].setLatLng([m.lat, m.lng]);
+            } else {
+              driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
+                .addTo(passengerMap)
+                .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`);
             }
-          });
-
-          data.forEach(m => {
-            if (m.lat && m.lng) {
-              if (driverMarkers[m.placa]) {
-                driverMarkers[m.placa].setLatLng([m.lat, m.lng]);
-              } else {
-                driverMarkers[m.placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
-                  .addTo(passengerMap)
-                  .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`);
-              }
-            }
-          });
-        }
-      }
-
-      await atualizarMotos();
-
-      supabaseClient
-        .channel('motos-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'motoristas' }, () => atualizarMotos())
-        .subscribe();
-    }
-
-    async function carregarEExibirPassageirosNoMapaMotorista() {
-      async function buscarEPintarPassageiros() {
-        const cincoMinutosAtras = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-
-        const { data: passData, error: passError } = await supabaseClient
-          .from('passageiros')
-          .select('*')
-          .gte('atualizado_em', cincoMinutosAtras);
-        
-        if (!passError && passData && driverMap) {
-          const telefonesAtuais = passData.map(p => p.telefone);
-
-          Object.keys(passengerMarkers).forEach(tel => {
-            if (!telefonesAtuais.includes(tel)) {
-              driverMap.removeLayer(passengerMarkers[tel]);
-              delete passengerMarkers[tel];
-            }
-          });
-
-          passData.forEach(p => {
-            if (currentUser && currentUser.phone && p.telefone === currentUser.phone) {
-              return;
-            }
-
-            if (p.lat && p.lng) {
-              if (passengerMarkers[p.telefone]) {
-                passengerMarkers[p.telefone].setLatLng([p.lat, p.lng]);
-              } else {
-                passengerMarkers[p.telefone] = L.marker([p.lat, p.lng], { icon: blueIcon })
-                  .addTo(driverMap)
-                  .bindPopup(`👤 <b>Passageiro Conectado:</b><br>${p.nome}<br>📞 ${p.telefone}`);
-              }
-            }
-          });
-        }
-      }
-
-      await buscarEPintarPassageiros();
-
-      supabaseClient
-        .channel('passageiros-em-tempo-real')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'passageiros' }, () => {
-          buscarEPintarPassageiros();
-        })
-        .subscribe();
+          }
+        });
+      });
     }
 
     function initDriverMapBase() {
@@ -421,73 +299,46 @@
       }
     }
 
-    async function salvarEAtivarGPSMotorista() {
+    function salvarEAtivarGPSMotorista() {
       if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(async (pos) => {
+        navigator.geolocation.watchPosition((pos) => {
           driverPos = [pos.coords.latitude, pos.coords.longitude];
-          
-          if (dSelfMarker) {
-            dSelfMarker.setLatLng(driverPos);
-          } else if (driverMap) {
-            dSelfMarker = L.marker(driverPos, { icon: motoIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`);
-          }
+          if (dSelfMarker) dSelfMarker.setLatLng(driverPos);
 
-          if (pendingRide) {
-            atualizarRotaBuscaMotorista([pendingRide.origem_lat, pendingRide.origem_lng]);
-          } else {
-            limparRotasMapaMotorista();
-          }
-
-          await supabaseClient.from('motoristas').upsert([{
+          const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+          db.ref('motoristas/' + keyPlate).set({
             nome: currentUser.name,
             placa: currentUser.plate,
             lat: driverPos[0],
             lng: driverPos[1],
-            atualizado_em: new Date().toISOString()
-          }], { onConflict: 'placa' });
+            updatedAt: Date.now()
+          });
         }, null, { enableHighAccuracy: true });
       }
     }
 
-    async function atualizarRotaBuscaMotorista(pOrigemPassageiro) {
-      if (!driverMap) return;
+    function carregarEExibirPassageirosNoMapaMotorista() {
+      db.ref('passageiros').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (!data || !driverMap) return;
 
-      if (!pendingRide || !pOrigemPassageiro) {
-        if (dPickupRouteLine) {
-          driverMap.removeLayer(dPickupRouteLine);
-          dPickupRouteLine = null;
-        }
-        return;
-      }
-
-      if (dPickupRouteLine) {
-        driverMap.removeLayer(dPickupRouteLine);
-        dPickupRouteLine = null;
-      }
-
-      const distAtePassageiro = L.latLng(driverPos).distanceTo(L.latLng(pOrigemPassageiro));
-      if (distAtePassageiro < 15) {
-        return;
-      }
-
-      const urlBusca = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
-
-      try {
-        const resBusca = await fetch(urlBusca);
-        const dataBusca = await resBusca.json();
-
-        if (dataBusca.routes && dataBusca.routes.length > 0) {
-          const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
-        }
-      } catch (e) {
-        console.error("Erro ao atualizar rota de busca:", e);
-      }
+        Object.keys(data).forEach(key => {
+          const p = data[key];
+          if (p.lat && p.lng) {
+            if (passengerMarkers[key]) {
+              passengerMarkers[key].setLatLng([p.lat, p.lng]);
+            } else {
+              passengerMarkers[key] = L.marker([p.lat, p.lng], { icon: blueIcon })
+                .addTo(driverMap)
+                .bindPopup(`👤 <b>Passageiro:</b><br>${p.nome}<br>📞 ${p.telefone}`);
+            }
+          }
+        });
+      });
     }
 
     async function onPassengerMapClick(e) {
       if (activeRideId) return;
-
       destino = [e.latlng.lat, e.latlng.lng];
 
       if (pDestMarker) {
@@ -511,11 +362,7 @@
           document.getElementById('price-text').innerText = `R$ ${valorEstimado.toFixed(2).replace('.', ',')}`;
 
           const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          
-          if (pRouteLine) {
-            passengerMap.removeLayer(pRouteLine);
-          }
-          
+          if (pRouteLine) passengerMap.removeLayer(pRouteLine);
           pRouteLine = L.polyline(coordinates, { color: '#007bff', weight: 5 }).addTo(passengerMap);
           passengerMap.fitBounds(pRouteLine.getBounds(), { padding: [40, 40] });
         }
@@ -524,76 +371,48 @@
       }
     }
 
-    async function solicitarCorrida() {
-      const { data, error } = await supabaseClient.from('corridas').insert([{
+    function solicitarCorrida() {
+      const newRideRef = db.ref('corridas').push();
+      activeRideId = newRideRef.key;
+
+      const rideData = {
+        id: activeRideId,
         origem_endereco: `${currentUser.name} (${currentUser.phone})`,
         origem_lat: origem[0],
         origem_lng: origem[1],
-        destino_endereco: 'Destino no Mapa',
         destino_lat: destino[0],
         destino_lng: destino[1],
         valor: parseFloat(valorEstimado.toFixed(2)),
         status: 'solicitada'
-      }]).select();
+      };
 
-      if (!error && data && data.length > 0) {
-        activeRideId = data[0].id;
-        document.getElementById('ride-details').style.display = 'none';
-        document.getElementById('status-box').style.display = 'block';
-        document.getElementById('status-box').style.color = '#d35400';
-        document.getElementById('status-box').innerText = `⏳ Aguardando motorista aceitar... (Valor: R$ ${valorEstimado.toFixed(2).replace('.', ',')})`;
+      newRideRef.set(rideData);
 
-        escutarStatusCorridaPassageiro(activeRideId);
-      } else {
-        alert("Erro ao solicitar corrida. Tente novamente.");
-      }
-    }
+      document.getElementById('ride-details').style.display = 'none';
+      document.getElementById('status-box').style.display = 'block';
+      document.getElementById('status-box').style.color = '#d35400';
+      document.getElementById('status-box').innerText = `⏳ Aguardando motorista aceitar... (Valor: R$ ${valorEstimado.toFixed(2).replace('.', ',')})`;
 
-    function escutarStatusCorridaPassageiro(rideId) {
-      if (intervalChecagemPassageiro) clearInterval(intervalChecagemPassageiro);
+      // ESCUTA O STATUS EM TEMPO REAL NO FIREBASE
+      db.ref('corridas/' + activeRideId).on('value', (snapshot) => {
+        const corrida = snapshot.val();
+        if (!corrida) return;
 
-      async function checarStatusDireto() {
-        if (!activeRideId) return;
+        const valorFormatado = (corrida.valor || valorEstimado || 0).toFixed(2).replace('.', ',');
 
-        const { data, error } = await supabaseClient
-          .from('corridas')
-          .select('status, valor')
-          .eq('id', rideId)
-          .single();
-
-        if (!error && data) {
-          atualizarTelaPassageiroComStatus(data.status, data.valor);
-        }
-      }
-
-      checarStatusDireto();
-      intervalChecagemPassageiro = setInterval(checarStatusDireto, 2000);
-    }
-
-    function atualizarTelaPassageiroComStatus(status, valor) {
-      const valorFormatado = (valor || valorEstimado || 0).toFixed(2).replace('.', ',');
-
-      if (status === 'aceita') {
-        const box = document.getElementById('status-box');
-        if (box) {
+        if (corrida.status === 'aceita') {
+          const box = document.getElementById('status-box');
           box.innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
           box.style.color = '#27ae60';
+        } else if (corrida.status === 'concluida') {
+          alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
+          db.ref('corridas/' + activeRideId).off();
+          resetarEstadoPassageiro();
         }
-      } else if (status === 'concluida') {
-        if (intervalChecagemPassageiro) {
-          clearInterval(intervalChecagemPassageiro);
-          intervalChecagemPassageiro = null;
-        }
-        alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
-        resetarEstadoPassageiro();
-      }
+      });
     }
 
     function resetarEstadoPassageiro() {
-      if (intervalChecagemPassageiro) {
-        clearInterval(intervalChecagemPassageiro);
-        intervalChecagemPassageiro = null;
-      }
       activeRideId = null;
       destino = null;
       if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
@@ -602,43 +421,40 @@
       document.getElementById('status-box').style.display = 'none';
       document.getElementById('instruction-text').style.display = 'block';
       document.getElementById('ride-details').style.display = 'none';
-
-      if (passengerMap && origem) {
-        passengerMap.setView(origem, 16);
-      }
     }
 
     function escutarCorridasMotorista() {
-      async function buscarSolicitacoes() {
+      db.ref('corridas').on('value', (snapshot) => {
+        const data = snapshot.val();
         if (activeRideId) return;
-        const { data } = await supabaseClient.from('corridas').select('*').eq('status', 'solicitada').limit(1);
 
-        if (data && data.length > 0) {
-          const corridaEncontrada = data[0];
+        let corridaEncontrada = null;
+        if (data) {
+          Object.keys(data).forEach(key => {
+            if (data[key].status === 'solicitada') {
+              corridaEncontrada = data[key];
+            }
+          });
+        }
 
-          if (!pendingRide || pendingRide.id !== corridaEncontrada.id) {
-            pendingRide = corridaEncontrada;
-            const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
-            notificarNovaSolicitacao(valorFormatado, pendingRide.origem_endereco);
-          }
-
+        if (corridaEncontrada) {
+          pendingRide = corridaEncontrada;
+          const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
+          
           document.getElementById('driver-empty-box').style.display = 'none';
           document.getElementById('driver-request-card').style.display = 'block';
-          const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
           document.getElementById('driver-ride-price').innerText = `R$ ${valorFormatado}`;
           document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
           exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
-        } else {
+        } else if (!activeRideId) {
           pendingRide = null;
           limparRotasMapaMotorista();
           document.getElementById('driver-empty-box').style.display = 'block';
           document.getElementById('driver-request-card').style.display = 'none';
           document.getElementById('driver-active-card').style.display = 'none';
         }
-      }
-      buscarSolicitacoes();
-      supabaseClient.channel('corridas-driver').on('postgres_changes', { event: '*', schema: 'public', table: 'corridas' }, () => buscarSolicitacoes()).subscribe();
+      });
     }
 
     function limparRotasMapaMotorista() {
@@ -649,106 +465,65 @@
     }
 
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
-      if (!driverMap) initDriverMapBase();
-
       limparRotasMapaMotorista();
 
       dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Passageiro Esperando Aqui</b>");
       dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon }).addTo(driverMap).bindPopup("<b>Destino do Passageiro</b>");
 
-      const urlBusca = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
       const urlViagem = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
 
       try {
-        const [resBusca, resViagem] = await Promise.all([fetch(urlBusca), fetch(urlViagem)]);
-        const dataBusca = await resBusca.json();
+        const resViagem = await fetch(urlViagem);
         const dataViagem = await resViagem.json();
-
-        let bounds = L.latLngBounds([driverPos, pOrigemPassageiro, pDestinoPassageiro]);
-
-        if (dataBusca.routes && dataBusca.routes.length > 0) {
-          const coordsBusca = dataBusca.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          dPickupRouteLine = L.polyline(coordsBusca, { color: '#e67e22', weight: 5, dashArray: '8, 8' }).addTo(driverMap);
-        }
 
         if (dataViagem.routes && dataViagem.routes.length > 0) {
           const coordsViagem = dataViagem.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
           dTripRouteLine = L.polyline(coordsViagem, { color: '#2980b9', weight: 6 }).addTo(driverMap);
+          driverMap.fitBounds(dTripRouteLine.getBounds(), { padding: [50, 50] });
         }
-
-        driverMap.fitBounds(bounds, { padding: [50, 50] });
       } catch (e) {
         console.error("Erro ao desenhar rotas:", e);
       }
     }
 
-    async function confirmarAceiteCorrida() {
+    function confirmarAceiteCorrida() {
       if (!pendingRide) return;
-      await supabaseClient.from('corridas').update({ status: 'aceita' }).eq('id', pendingRide.id);
       activeRideId = pendingRide.id;
 
-      if (dPickupRouteLine) {
-        driverMap.removeLayer(dPickupRouteLine);
-        dPickupRouteLine = null;
-      }
+      // Atualiza status no Firebase
+      db.ref('corridas/' + activeRideId).update({ status: 'aceita' });
+
+      limparRotasMapaMotorista();
 
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
-
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
       document.getElementById('driver-active-ride-price').innerText = `R$ ${valorFormatado}`;
       document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
     }
 
-    async function finalizarCorrida() {
+    function finalizarCorrida() {
       if (!activeRideId) return;
-      
+
       const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
 
-      try {
-        await supabaseClient.from('corridas').update({ status: 'concluida' }).eq('id', activeRideId);
-        alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}`);
-      } catch (e) {
-        console.error("Erro ao finalizar corrida:", e);
-      } finally {
-        activeRideId = null;
-        pendingRide = null;
+      // Atualiza status no Firebase para concluida
+      db.ref('corridas/' + activeRideId).update({ status: 'concluida' });
 
-        limparRotasMapaMotorista();
+      alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}`);
 
-        if (driverMap && driverPos) {
-          driverMap.setView(driverPos, 16);
-        }
+      activeRideId = null;
+      pendingRide = null;
+      limparRotasMapaMotorista();
 
-        document.getElementById('driver-active-card').style.display = 'none';
-        document.getElementById('driver-request-card').style.display = 'none';
-        document.getElementById('driver-empty-box').style.display = 'block';
-      }
+      document.getElementById('driver-active-card').style.display = 'none';
+      document.getElementById('driver-request-card').style.display = 'none';
+      document.getElementById('driver-empty-box').style.display = 'block';
     }
 
-    async function removerUsuarioSincrono() {
-      if (!currentUser) return;
-      if (currentUser.role === 'passageiro' && currentUser.phone) {
-        await supabaseClient.from('passageiros').delete().eq('telefone', currentUser.phone);
-      } else if (currentUser.role === 'motorista' && currentUser.plate) {
-        await supabaseClient.from('motoristas').delete().eq('placa', currentUser.plate);
-      }
-    }
-
-    async function sairDaConta() {
-      if (wakeLock !== null) {
-        try {
-          await wakeLock.release();
-          wakeLock = null;
-        } catch (e) {}
-      }
-      await removerUsuarioSincrono();
+    function sairDaConta() {
       location.reload();
     }
-
-    window.addEventListener('beforeunload', () => {
-      removerUsuarioSincrono();
-    });
   </script>
 </body>
 </html>
