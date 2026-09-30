@@ -68,6 +68,22 @@
     .leaflet-top {
       top: 60px !important;
     }
+
+    /* ESTILO DOS RÓTULOS DE NOME NO MAPA */
+    .custom-label {
+      background: #222;
+      color: #fff;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 3px 7px;
+      font-size: 11px;
+      font-weight: bold;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .leaflet-tooltip-bottom.custom-label::before {
+      border-bottom-color: #222;
+    }
   </style>
 </head>
 <body>
@@ -176,13 +192,13 @@
   <script>
     // CONFIGURAÇÃO DO SEU PROJETO NO FIREBASE
     const firebaseConfig = {
-      apiKey: "AIzaSyCHZvFu6YPrrLB-ssTJ2gES_QaQASLVy9M", // ⚠️️ Substitua pela sua apiKey do Firebase
+      apiKey: "", /AIzaSyCHZvFu6YPrrLB-ssTJ2gES_QaQASLVy9M/ ⚠️ Substitua pela sua apiKey do Firebase
       authDomain: "moto-taxi-sjn-d9b71.firebaseapp.com",
       databaseURL: "https://moto-taxi-sjn-d9b71-default-rtdb.firebaseio.com",
       projectId: "moto-taxi-sjn-d9b71",
       storageBucket: "moto-taxi-sjn-d9b71.appspot.com",
       messagingSenderId: "13246123116",
-      appId: "1:13246123116:web:85941b49c4f5528ca05c49" // ⚠️ Substitua pelo seu appId do Firebase
+      appId: "" /1:13246123116:web:85941b49c4f5528ca05c49/ ⚠️ Substitua pelo seu appId do Firebase
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -290,7 +306,11 @@
       if (!passengerMap) {
         passengerMap = L.map('passenger-map', { zoomControl: true }).setView(origem, 16);
         L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(passengerMap);
-        pUserMarker = L.marker(origem, { icon: blueIcon }).addTo(passengerMap).bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`).openPopup();
+        
+        pUserMarker = L.marker(origem, { icon: blueIcon })
+          .addTo(passengerMap)
+          .bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`)
+          .bindTooltip(`👤 ${currentUser.name}`, { permanent: true, direction: 'bottom', className: 'custom-label' });
       }
       
       passengerMap.invalidateSize();
@@ -300,7 +320,6 @@
 
       passengerRef.onDisconnect().remove();
 
-      // REGISTA O PASSAGEIRO NO FIREBASE LOGO QUE O APP ABRE
       passengerRef.set({
         nome: currentUser.name,
         telefone: currentUser.phone,
@@ -356,7 +375,8 @@
             } else {
               driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                 .addTo(passengerMap)
-                .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`);
+                .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
+                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
@@ -367,7 +387,11 @@
       if (!driverMap) {
         driverMap = L.map('driver-map', { zoomControl: true }).setView(driverPos, 16);
         L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(driverMap);
-        dSelfMarker = L.marker(driverPos, { icon: motoIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`).openPopup();
+        
+        dSelfMarker = L.marker(driverPos, { icon: motoIcon })
+          .addTo(driverMap)
+          .bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`)
+          .bindTooltip(`🏍️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
         
         dRouteLayerGroup = L.layerGroup().addTo(driverMap);
       }
@@ -407,7 +431,6 @@
       }
     }
 
-    // EXIBE PASSAGEIROS NO MAPA DO MOTORISTA ASSIM QUE ELES SE CONECTAM
     function carregarEExibirPassageirosNoMapaMotorista() {
       db.ref('passageiros').on('value', (snapshot) => {
         const data = snapshot.val() || {};
@@ -416,7 +439,6 @@
         const agora = Date.now();
         const CINCO_MINUTOS = 5 * 60 * 1000;
 
-        // Limpa passageiros que saíram ou estão inativos há mais de 5 minutos
         Object.keys(passengerMarkers).forEach(key => {
           const p = data[key];
           const isOffline = !p || !p.updatedAt || (agora - p.updatedAt > CINCO_MINUTOS);
@@ -427,7 +449,6 @@
           }
         });
 
-        // Adiciona ou atualiza passageiros ativos no mapa do motorista
         Object.keys(data).forEach(key => {
           const p = data[key];
           const isOnline = p && p.updatedAt && (agora - p.updatedAt <= CINCO_MINUTOS);
@@ -438,7 +459,8 @@
             } else {
               passengerMarkers[key] = L.marker([p.lat, p.lng], { icon: blueIcon })
                 .addTo(driverMap)
-                .bindPopup(`👤 <b>Passageiro:</b><br>${p.nome}<br>📞 ${p.telefone}`);
+                .bindPopup(`👤 <b>Passageiro:</b><br>${p.nome}<br>📞 ${p.telefone}`)
+                .bindTooltip(`👤 ${p.nome}`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
@@ -586,8 +608,15 @@
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro, ajustarZoom = false) {
       limparRotasMapaMotorista();
 
-      dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Embarque Passageiro</b>");
-      dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon }).addTo(driverMap).bindPopup("<b>Destino Final</b>");
+      dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
+        .addTo(driverMap)
+        .bindPopup("<b>Embarque Passageiro</b>")
+        .bindTooltip("🟢 Embarque", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
+      dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon })
+        .addTo(driverMap)
+        .bindPopup("<b>Destino Final</b>")
+        .bindTooltip("🔴 Destino", { permanent: true, direction: 'bottom', className: 'custom-label' });
 
       const urlAtePassageiro = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
       const urlAteDestino = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
