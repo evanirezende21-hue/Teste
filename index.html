@@ -26,7 +26,6 @@
     .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #333; color: #fff; font-size: 14px; outline: none; }
     .form-group input:focus { border-color: #ffc107; }
 
-    /* HEADER FLUTUANTE SOBRE O MAPA */
     header { 
       position: absolute; 
       top: 0; 
@@ -47,7 +46,6 @@
     header .user-badge { font-size: 12px; background: rgba(255,255,255,0.1); color: #fff; padding: 4px 8px; border-radius: 12px; margin-top: 2px; }
     header button { background: #ffc107; color: #000; border: none; padding: 8px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; }
 
-    /* CONTAINER DO MAPA EM TELA CHEIA */
     .map-container { 
       position: absolute; 
       top: 0; 
@@ -183,7 +181,6 @@
       appId: "1:13246123116:web:85941b49c4f5528ca05c49" // ⚠️ Substitua pelo seu appId do Firebase
     };
 
-    // Inicializa o Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
@@ -196,7 +193,7 @@
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine;
     let dSelfMarker, dOrigMarker, dDestMarker;
-    let dTripRouteLine;
+    let dRouteLayerGroup = null;
 
     let driverMarkers = {}; 
     let passengerMarkers = {};
@@ -358,6 +355,8 @@
         driverMap = L.map('driver-map', { zoomControl: false }).setView(driverPos, 16);
         L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(driverMap);
         dSelfMarker = L.marker(driverPos, { icon: motoIcon }).addTo(driverMap).bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`).openPopup();
+        
+        dRouteLayerGroup = L.layerGroup().addTo(driverMap);
       }
       
       driverMap.invalidateSize();
@@ -384,7 +383,6 @@
             updatedAt: Date.now()
           });
 
-          // Atualiza ambas as rotas conforme o GPS se desloca
           if (pendingRide) {
             exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng]);
           }
@@ -562,19 +560,16 @@
     function limparRotasMapaMotorista() {
       if (dOrigMarker) { driverMap.removeLayer(dOrigMarker); dOrigMarker = null; }
       if (dDestMarker) { driverMap.removeLayer(dDestMarker); dDestMarker = null; }
-      if (dTripRouteLine) { driverMap.removeLayer(dTripRouteLine); dTripRouteLine = null; }
+      if (dRouteLayerGroup) { dRouteLayerGroup.clearLayers(); }
     }
 
-    // MONTA A ROTA COMPLETA TRACEJADA (MOTO -> EMBARQUE VERDE -> DESTINO VERMELHO)
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro) {
       limparRotasMapaMotorista();
 
       dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon }).addTo(driverMap).bindPopup("<b>Embarque Passageiro</b>");
       dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon }).addTo(driverMap).bindPopup("<b>Destino Final</b>");
 
-      // Rota 1: Moto até o Embarque
       const urlAtePassageiro = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
-      // Rota 2: Embarque até o Destino
       const urlAteDestino = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
 
       try {
@@ -591,13 +586,13 @@
           coordsTotais = coordsTotais.concat(data2.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
         }
 
-        if (coordsTotais.length > 0) {
-          dTripRouteLine = L.polyline(coordsTotais, { 
+        if (coordsTotais.length > 0 && dRouteLayerGroup) {
+          L.polyline(coordsTotais, { 
             color: '#2980b9', 
             weight: 6,
             dashArray: '10, 10',
             opacity: 0.9 
-          }).addTo(driverMap);
+          }).addTo(dRouteLayerGroup);
 
           driverMap.fitBounds(L.featureGroup([dSelfMarker, dOrigMarker, dDestMarker]).getBounds(), { padding: [50, 50] });
         }
@@ -630,7 +625,7 @@
 
       const rideRef = db.ref('corridas/' + activeRideId);
       rideRef.update({ status: 'concluida' }).then(() => {
-        setTimeout(() => rideRef.remove(), 2000);
+        setTimeout(() => rideRef.remove(), 1000);
       });
 
       limparRotasMapaMotorista();
@@ -649,6 +644,8 @@
       if (wakeLock !== null) {
         wakeLock.release().then(() => { wakeLock = null; });
       }
+
+      limparRotasMapaMotorista();
 
       if (currentUser) {
         if (currentUser.role === 'motorista' && currentUser.plate) {
