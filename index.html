@@ -293,20 +293,7 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // MONITOR DE ESTADO DA AUTENTICAÇÃO DO FIREBASE (CAPTURA O LOGIN DO GOOGLE AUTOMATICAMENTE)
-    auth.onAuthStateChanged((user) => {
-      if (user) {
-        const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
-        const savedPlate = localStorage.getItem('sjn_plate') || document.getElementById('user-plate').value.trim() || 'ABC-1234';
-        
-        currentRole = savedRole;
-        let phone = user.phoneNumber || user.email || 'Google User';
-
-        entrarNoAppComDados(user.displayName, phone, savedPlate);
-      }
-    });
-
-    // INICIA LOGIN COM O GOOGLE SALVANDO AS PREFERÊNCIAS DO USUÁRIO
+    // LOGIN COM GOOGLE DIRETO (POP-UP)
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
@@ -315,13 +302,13 @@
         return;
       }
 
-      // Salva a escolha no armazenamento do dispositivo
-      localStorage.setItem('sjn_role', currentRole);
-      localStorage.setItem('sjn_plate', plateInput || 'ABC-1234');
-
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
-        await auth.signInWithRedirect(provider);
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        let phone = user.phoneNumber || user.email || 'Google User';
+        
+        entrarNoAppComDados(user.displayName, phone, plateInput || 'ABC-1234');
       } catch (error) {
         console.error("Erro no login Google:", error);
         alert("Erro ao conectar com a conta do Google: " + error.message);
@@ -776,7 +763,6 @@
         }
       }
 
-      localStorage.clear();
       auth.signOut();
       location.reload();
     }
