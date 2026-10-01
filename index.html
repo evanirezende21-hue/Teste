@@ -293,13 +293,21 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // LOGIN COM GOOGLE
+    // LOGIN COM GOOGLE VIA REDIRECIONAMENTO (EVITA BLOQUEIO DE POP-UP)
     async function entrarComGoogle() {
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
-        const result = await auth.signInWithPopup(provider);
+        await auth.signInWithRedirect(provider);
+      } catch (error) {
+        console.error("Erro no login Google:", error);
+        alert("Erro ao conectar com a conta do Google: " + error.message);
+      }
+    }
+
+    // PROCESSA O RESULTADO QUANDO O GOOGLE REDIRECIONA DE VOLTA PARA O APP
+    auth.getRedirectResult().then((result) => {
+      if (result.user) {
         const user = result.user;
-        
         let phone = user.phoneNumber || user.email || 'Google User';
         let plate = document.getElementById('user-plate').value.trim() || 'ABC-1234';
 
@@ -307,11 +315,10 @@
         if (currentRole === 'passageiro') document.getElementById('user-phone').value = phone;
 
         entrarNoAppComDados(user.displayName, phone, plate);
-      } catch (error) {
-        console.error("Erro no login Google:", error);
-        alert("Erro ao conectar com a conta do Google: " + error.message);
       }
-    }
+    }).catch((error) => {
+      console.error("Erro ao processar login:", error);
+    });
 
     function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
@@ -429,7 +436,7 @@
               driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                 .addTo(passengerMap)
                 .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
-                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+                .bindTooltip(`🏍️️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
