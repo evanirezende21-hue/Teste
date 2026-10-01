@@ -293,8 +293,19 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // LOGIN COM GOOGLE VIA REDIRECIONAMENTO (EVITA BLOQUEIO DE POP-UP)
+    // SALVA A ESCOLHA DO USUÁRIO E INICIA O GOOGLE
     async function entrarComGoogle() {
+      const plateInput = document.getElementById('user-plate').value.trim();
+      
+      if (currentRole === 'motorista' && !plateInput) {
+        alert('Motorista: Por favor, digite a Placa da sua moto antes de entrar com o Google.');
+        return;
+      }
+
+      // Salva o papel e a placa na sessão do navegador
+      sessionStorage.setItem('tempRole', currentRole);
+      sessionStorage.setItem('tempPlate', plateInput || 'ABC-1234');
+
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
         await auth.signInWithRedirect(provider);
@@ -304,17 +315,17 @@
       }
     }
 
-    // PROCESSA O RESULTADO QUANDO O GOOGLE REDIRECIONA DE VOLTA PARA O APP
+    // PROCESSA O RETORNO DO GOOGLE E VAI DIRETO PARA O MAPA
     auth.getRedirectResult().then((result) => {
       if (result.user) {
         const user = result.user;
+        const savedRole = sessionStorage.getItem('tempRole') || 'passageiro';
+        const savedPlate = sessionStorage.getItem('tempPlate') || 'ABC-1234';
+
+        currentRole = savedRole;
         let phone = user.phoneNumber || user.email || 'Google User';
-        let plate = document.getElementById('user-plate').value.trim() || 'ABC-1234';
 
-        document.getElementById('user-name').value = user.displayName;
-        if (currentRole === 'passageiro') document.getElementById('user-phone').value = phone;
-
-        entrarNoAppComDados(user.displayName, phone, plate);
+        entrarNoAppComDados(user.displayName, phone, savedPlate);
       }
     }).catch((error) => {
       console.error("Erro ao processar login:", error);
@@ -375,7 +386,7 @@
       
       passengerMap.invalidateSize();
 
-      const keyPhone = currentUser.phone.replace(/[^0-9]/g, '') || Date.now();
+      const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '') || Date.now();
       const passengerRef = db.ref('passageiros/' + keyPhone);
 
       passengerRef.onDisconnect().remove();
@@ -436,7 +447,7 @@
               driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                 .addTo(passengerMap)
                 .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
-                .bindTooltip(`🏍️️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+                .bindTooltip(`🏍 ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
@@ -450,7 +461,7 @@
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
           .addTo(driverMap)
-          .bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`)
+          .bindPopup(`🏍️️ <b>Sua Moto</b><br>${currentUser.name}`)
           .bindTooltip(`🏍️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
         
         dRouteLayerGroup = L.layerGroup().addTo(driverMap);
@@ -570,7 +581,7 @@
       const newRideRef = db.ref('corridas').push();
       activeRideId = newRideRef.key;
 
-      const keyPhone = currentUser.phone.replace(/[^0-9]/g, '') || Date.now();
+      const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '') || Date.now();
 
       const rideData = {
         id: activeRideId,
@@ -611,7 +622,7 @@
 
     function resetarEstadoPassageiro() {
       if (currentUser && currentUser.phone) {
-        const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+        const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '');
         if (keyPhone) db.ref('passageiros/' + keyPhone).remove();
       }
 
@@ -763,11 +774,12 @@
           const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
           db.ref('motoristas/' + keyPlate).remove();
         } else if (currentUser.role === 'passageiro' && currentUser.phone) {
-          const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+          const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '');
           if (keyPhone) db.ref('passageiros/' + keyPhone).remove();
         }
       }
 
+      sessionStorage.clear();
       auth.signOut();
       location.reload();
     }
