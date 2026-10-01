@@ -287,28 +287,56 @@
 
     function setRole(newRole) {
       currentRole = newRole;
+      localStorage.setItem('sjn_role', newRole);
       document.getElementById('tab-passenger').classList.toggle('active', newRole === 'passageiro');
       document.getElementById('tab-driver').classList.toggle('active', newRole === 'motorista');
       document.getElementById('group-phone').style.display = newRole === 'passageiro' ? 'block' : 'none';
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // LOGIN COM GOOGLE DIRETO (POP-UP)
+    // VERIFICA LOGIN AUTOMÁTICO QUANDO RETORNA DO GOOGLE NO TELEMÓVEL OU AO RECARREGAR
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        const savedRole = localStorage.getItem('sjn_role') || 'passageiro';
+        const savedPlate = localStorage.getItem('sjn_plate') || 'ABC-1234';
+        
+        currentRole = savedRole;
+        let phone = user.phoneNumber || user.email || 'Google User';
+
+        entrarNoAppComDados(user.displayName, phone, savedPlate);
+      }
+    });
+
+    // INICIA AUTENTICAÇÃO COM GOOGLE
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
-      if (currentRole === 'motorista' && !plateInput) {
-        alert('Motorista: Por favor, digite a Placa da sua moto antes de clicar em Entrar com o Google.');
+      if (currentRole === 'motorista' && !plateInput && !localStorage.getItem('sjn_plate')) {
+        alert('Motorista: Por favor, digite a Placa da sua moto antes de entrar com o Google.');
         return;
       }
 
+      if (plateInput) {
+        localStorage.setItem('sjn_plate', plateInput);
+      }
+      localStorage.setItem('sjn_role', currentRole);
+
       const provider = new firebase.auth.GoogleAuthProvider();
+
+      // Detecta se é dispositivo móvel (telemóvel)
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
       try {
-        const result = await auth.signInWithPopup(provider);
-        const user = result.user;
-        let phone = user.phoneNumber || user.email || 'Google User';
-        
-        entrarNoAppComDados(user.displayName, phone, plateInput || 'ABC-1234');
+        if (isMobile) {
+          // No telemóvel usa Redirecionamento (evita bloqueador de pop-ups)
+          await auth.signInWithRedirect(provider);
+        } else {
+          // No computador usa Pop-up direto
+          const result = await auth.signInWithPopup(provider);
+          const user = result.user;
+          let phone = user.phoneNumber || user.email || 'Google User';
+          entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
+        }
       } catch (error) {
         console.error("Erro no login Google:", error);
         alert("Erro ao conectar com a conta do Google: " + error.message);
@@ -446,7 +474,7 @@
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
           .addTo(driverMap)
           .bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`)
-          .bindTooltip(`🏍️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+          .bindTooltip(`🏍️️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
         
         dRouteLayerGroup = L.layerGroup().addTo(driverMap);
       }
@@ -763,6 +791,8 @@
         }
       }
 
+      localStorage.removeItem('sjn_role');
+      localStorage.removeItem('sjn_plate');
       auth.signOut();
       location.reload();
     }
