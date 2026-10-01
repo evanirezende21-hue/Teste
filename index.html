@@ -65,11 +65,30 @@
     .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
 
+    /* BOTÃO DO GOOGLE */
+    .btn-google {
+      width: 100%;
+      background: #ffffff;
+      color: #333333;
+      border: 1px solid #cccccc;
+      padding: 12px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .btn-google:hover { background: #f5f5f5; }
+
     .leaflet-top {
       top: 60px !important;
     }
 
-    /* ESTILO DOS RÓTULOS DE NOME NO MAPA */
     .custom-label {
       background: #222;
       color: #fff;
@@ -97,6 +116,14 @@
         <button class="tab-btn active" id="tab-passenger" onclick="setRole('passageiro')">Passageiro</button>
         <button class="tab-btn" id="tab-driver" onclick="setRole('motorista')">Motorista</button>
       </div>
+
+      <!-- BOTÃO ENTRAR COM O GOOGLE -->
+      <button class="btn-google" onclick="entrarComGoogle()">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.76.53-1.78.9-3.12.9-2.38 0-4.41-1.57-5.13-3.72L.98 13.01C2.47 15.97 5.49 18 9 18z"/><path fill="#FBBC05" d="M3.87 10.8c-.19-.53-.3-1.1-.3-1.8s.11-1.27.3-1.8L.98 4.99C.35 6.24 0 7.65 0 9s.35 2.76.98 4.01l2.89-2.21z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.49 0 2.47 2.03.98 4.99l2.89 2.21C4.59 5.05 6.62 3.58 9 3.58z"/></svg>
+        ENTRAR COM O GOOGLE
+      </button>
+
+      <div style="color: #666; font-size: 12px; margin-bottom: 16px;">— OU USE O CADASTRO MANUAL —</div>
 
       <div id="form-container">
         <div class="form-group">
@@ -185,8 +212,9 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Firebase App & Realtime Database SDKs -->
+  <!-- Firebase App, Auth & Realtime Database SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
   <script>
@@ -203,6 +231,7 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const auth = firebase.auth();
 
     let currentRole = 'passageiro';
     let currentUser = null;
@@ -264,7 +293,27 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    async function entrarNoApp() {
+    // LOGIN COM GOOGLE
+    async function entrarComGoogle() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        
+        let phone = user.phoneNumber || user.email || 'Google User';
+        let plate = document.getElementById('user-plate').value.trim() || 'ABC-1234';
+
+        document.getElementById('user-name').value = user.displayName;
+        if (currentRole === 'passageiro') document.getElementById('user-phone').value = phone;
+
+        entrarNoAppComDados(user.displayName, phone, plate);
+      } catch (error) {
+        console.error("Erro no login Google:", error);
+        alert("Erro ao conectar com a conta do Google: " + error.message);
+      }
+    }
+
+    function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
       const phone = document.getElementById('user-phone').value.trim();
       const plate = document.getElementById('user-plate').value.trim();
@@ -274,6 +323,10 @@
         return;
       }
 
+      entrarNoAppComDados(name, phone, plate);
+    }
+
+    function entrarNoAppComDados(name, phone, plate) {
       currentUser = { name, phone, plate, role: currentRole };
 
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -315,7 +368,7 @@
       
       passengerMap.invalidateSize();
 
-      const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+      const keyPhone = currentUser.phone.replace(/[^0-9]/g, '') || Date.now();
       const passengerRef = db.ref('passageiros/' + keyPhone);
 
       passengerRef.onDisconnect().remove();
@@ -510,7 +563,7 @@
       const newRideRef = db.ref('corridas').push();
       activeRideId = newRideRef.key;
 
-      const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
+      const keyPhone = currentUser.phone.replace(/[^0-9]/g, '') || Date.now();
 
       const rideData = {
         id: activeRideId,
@@ -552,7 +605,7 @@
     function resetarEstadoPassageiro() {
       if (currentUser && currentUser.phone) {
         const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
-        db.ref('passageiros/' + keyPhone).remove();
+        if (keyPhone) db.ref('passageiros/' + keyPhone).remove();
       }
 
       activeRideId = null;
@@ -704,9 +757,11 @@
           db.ref('motoristas/' + keyPlate).remove();
         } else if (currentUser.role === 'passageiro' && currentUser.phone) {
           const keyPhone = currentUser.phone.replace(/[^0-9]/g, '');
-          db.ref('passageiros/' + keyPhone).remove();
+          if (keyPhone) db.ref('passageiros/' + keyPhone).remove();
         }
       }
+
+      auth.signOut();
       location.reload();
     }
 
