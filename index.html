@@ -220,7 +220,7 @@
   <script>
     // CONFIGURAÇÃO DO SEU PROJETO NO FIREBASE
     const firebaseConfig = {
-      apiKey: "AIzaSyCHZvFu6YPrrLB-ssTJ2gES_QaQASLVy9M", // ⚠️ Substitua pela sua apiKey do Firebase
+      apiKey: "AIzaSyCHZvFu6YPrrLB-ssTJ2gES_QaQASLVy9MI", // ⚠️ Substitua pela sua apiKey do Firebase
       authDomain: "moto-taxi-sjn-d9b71.firebaseapp.com",
       databaseURL: "https://moto-taxi-sjn-d9b71-default-rtdb.firebaseio.com",
       projectId: "moto-taxi-sjn-d9b71",
@@ -293,18 +293,31 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // SALVA A ESCOLHA DO USUÁRIO E INICIA O GOOGLE
+    // MONITOR DE ESTADO DA AUTENTICAÇÃO DO FIREBASE (CAPTURA O LOGIN DO GOOGLE AUTOMATICAMENTE)
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
+        const savedPlate = localStorage.getItem('sjn_plate') || document.getElementById('user-plate').value.trim() || 'ABC-1234';
+        
+        currentRole = savedRole;
+        let phone = user.phoneNumber || user.email || 'Google User';
+
+        entrarNoAppComDados(user.displayName, phone, savedPlate);
+      }
+    });
+
+    // INICIA LOGIN COM O GOOGLE SALVANDO AS PREFERÊNCIAS DO USUÁRIO
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
       if (currentRole === 'motorista' && !plateInput) {
-        alert('Motorista: Por favor, digite a Placa da sua moto antes de entrar com o Google.');
+        alert('Motorista: Por favor, digite a Placa da sua moto antes de clicar em Entrar com o Google.');
         return;
       }
 
-      // Salva o papel e a placa na sessão do navegador
-      sessionStorage.setItem('tempRole', currentRole);
-      sessionStorage.setItem('tempPlate', plateInput || 'ABC-1234');
+      // Salva a escolha no armazenamento do dispositivo
+      localStorage.setItem('sjn_role', currentRole);
+      localStorage.setItem('sjn_plate', plateInput || 'ABC-1234');
 
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
@@ -314,22 +327,6 @@
         alert("Erro ao conectar com a conta do Google: " + error.message);
       }
     }
-
-    // PROCESSA O RETORNO DO GOOGLE E VAI DIRETO PARA O MAPA
-    auth.getRedirectResult().then((result) => {
-      if (result.user) {
-        const user = result.user;
-        const savedRole = sessionStorage.getItem('tempRole') || 'passageiro';
-        const savedPlate = sessionStorage.getItem('tempPlate') || 'ABC-1234';
-
-        currentRole = savedRole;
-        let phone = user.phoneNumber || user.email || 'Google User';
-
-        entrarNoAppComDados(user.displayName, phone, savedPlate);
-      }
-    }).catch((error) => {
-      console.error("Erro ao processar login:", error);
-    });
 
     function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
@@ -447,7 +444,7 @@
               driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                 .addTo(passengerMap)
                 .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
-                .bindTooltip(`🏍 ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
@@ -461,7 +458,7 @@
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
           .addTo(driverMap)
-          .bindPopup(`🏍️️ <b>Sua Moto</b><br>${currentUser.name}`)
+          .bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`)
           .bindTooltip(`🏍️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
         
         dRouteLayerGroup = L.layerGroup().addTo(driverMap);
@@ -779,7 +776,7 @@
         }
       }
 
-      sessionStorage.clear();
+      localStorage.clear();
       auth.signOut();
       location.reload();
     }
