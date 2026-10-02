@@ -206,7 +206,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Firebase App, Auth, Database & Messaging SDKs -->
+  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -226,11 +226,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
-    let messaging = null;
-
-    if (firebase.messaging.isSupported()) {
-      messaging = firebase.messaging();
-    }
 
     let currentRole = 'passageiro';
     let currentUser = null;
@@ -269,7 +264,6 @@
       popupAnchor: [0, -18]
     });
 
-    // Função para emitir som e vibração
     function alertarMotoristaComSom() {
       if ('vibrate' in navigator) {
         navigator.vibrate([300, 150, 300, 150, 300]);
@@ -290,25 +284,6 @@
       }
     }
 
-    // Pedir permissão de Notificação Push ao Motorista
-    async function solicitarPermissaoNotificacoes() {
-      if (!('Notification' in window)) return;
-      
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted' && navigator.serviceWorker) {
-        navigator.serviceWorker.register('firebase-messaging-sw.js').then((reg) => {
-          if (messaging) {
-            messaging.getToken({ serviceWorkerRegistration: reg }).then((token) => {
-              if (token && currentUser && currentUser.plate) {
-                const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
-                db.ref('motoristas/' + keyPlate + '/fcmToken').set(token);
-              }
-            });
-          }
-        });
-      }
-    }
-
     async function manterTelaAcesa() {
       try {
         if ('wakeLock' in navigator) {
@@ -319,61 +294,51 @@
       }
     }
 
-    document.addEventListener('visibilitychange', async () => {
-      if (wakeLock !== null && document.visibilityState === 'visible' && currentUser && currentUser.role === 'motorista') {
-        await manterTelaAcesa();
-      }
-    });
-
     function setRole(newRole) {
       currentRole = newRole;
-      localStorage.setItem('sjn_role', newRole);
       document.getElementById('tab-passenger').classList.toggle('active', newRole === 'passageiro');
       document.getElementById('tab-driver').classList.toggle('active', newRole === 'motorista');
       document.getElementById('group-phone').style.display = newRole === 'passageiro' ? 'block' : 'none';
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    auth.onAuthStateChanged((user) => {
-      if (user) {
-        const savedRole = localStorage.getItem('sjn_role') || 'passageiro';
-        const savedPlate = localStorage.getItem('sjn_plate') || 'ABC-1234';
-        
-        currentRole = savedRole;
-        let phone = user.phoneNumber || user.email || 'Google User';
-
-        entrarNoAppComDados(user.displayName, phone, savedPlate);
-      }
-    });
-
+    // AUTENTICAÇÃO DIRETA DO GOOGLE PELA SESSÃO
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
-      if (currentRole === 'motorista' && !plateInput && !localStorage.getItem('sjn_plate')) {
+      if (currentRole === 'motorista' && !plateInput) {
         alert('Motorista: Por favor, digite a Placa da sua moto antes de entrar com o Google.');
         return;
       }
 
-      if (plateInput) localStorage.setItem('sjn_plate', plateInput);
-      localStorage.setItem('sjn_role', currentRole);
-
       const provider = new firebase.auth.GoogleAuthProvider();
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
       try {
-        if (isMobile) {
-          await auth.signInWithRedirect(provider);
-        } else {
-          const result = await auth.signInWithPopup(provider);
-          const user = result.user;
-          let phone = user.phoneNumber || user.email || 'Google User';
-          entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
-        }
+        // Tenta usar Popup direto em todos os dispositivos para evitar perda da página
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        let phone = user.phoneNumber || user.email || 'Google User';
+        entrarNoAppComDados(user.displayName, phone, plateInput || 'ABC-1234');
       } catch (error) {
         console.error("Erro no login Google:", error);
-        alert("Erro ao conectar com a conta do Google: " + error.message);
+        // Se o popup for bloqueado no telemóvel, executa o redirecionamento
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+          auth.signInWithRedirect(provider);
+        } else {
+          alert("Erro ao conectar com a conta do Google: " + error.message);
+        }
       }
     }
+
+    // RESTAURA SESSÃO CASO RETORNE DO REDIRECIONAMENTO
+    auth.getRedirectResult().then((result) => {
+      if (result && result.user) {
+        const user = result.user;
+        let phone = user.phoneNumber || user.email || 'Google User';
+        let plate = document.getElementById('user-plate').value.trim() || 'ABC-1234';
+        entrarNoAppComDados(user.displayName, phone, plate);
+      }
+    }).catch((error) => console.log(error));
 
     function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
@@ -407,7 +372,6 @@
         document.getElementById('driver-screen').classList.add('active');
         
         manterTelaAcesa();
-        solicitarPermissaoNotificacoes();
 
         setTimeout(() => {
           initDriverMapBase();
@@ -492,7 +456,7 @@
               driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                 .addTo(passengerMap)
                 .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
-                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+                .bindTooltip(`🏍️️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
@@ -706,17 +670,9 @@
 
           exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng], true);
 
-          // Tocar alerta de som e enviar notificação quando chegar corrida nova
           if (lastNotifiedRideId !== pendingRide.id) {
             lastNotifiedRideId = pendingRide.id;
             alertarMotoristaComSom();
-
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification("🛵 Nova Solicitação de Moto Táxi!", {
-                body: `Passageiro: ${pendingRide.origem_endereco}\nValor: R$ ${valorFormatado}`,
-                icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png'
-              });
-            }
           }
 
         } else if (!activeRideId) {
@@ -839,8 +795,6 @@
         }
       }
 
-      localStorage.removeItem('sjn_role');
-      localStorage.removeItem('sjn_plate');
       auth.signOut();
       location.reload();
     }
