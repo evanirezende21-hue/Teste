@@ -8,6 +8,9 @@
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
+  <!-- SDK do Google Identity (One Tap / Google Sign-In Nativo) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     html, body { height: 100%; width: 100%; overflow: hidden; background: #212121; }
@@ -210,7 +213,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
   <script>
     const firebaseConfig = {
@@ -302,7 +304,7 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // AUTENTICAÇÃO DIRETA DO GOOGLE PELA SESSÃO
+    // LOGIN COM GOOGLE COMPATÍVEL COM CELULARES (POPUP + REDIRECT FALLBACK)
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
@@ -312,17 +314,19 @@
       }
 
       const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
 
       try {
-        // Tenta usar Popup direto em todos os dispositivos para evitar perda da página
         const result = await auth.signInWithPopup(provider);
         const user = result.user;
         let phone = user.phoneNumber || user.email || 'Google User';
         entrarNoAppComDados(user.displayName, phone, plateInput || 'ABC-1234');
       } catch (error) {
-        console.error("Erro no login Google:", error);
-        // Se o popup for bloqueado no telemóvel, executa o redirecionamento
-        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+        console.error("Erro no Popup:", error);
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+          // Salva os dados temporariamente antes do redirecionamento
+          sessionStorage.setItem('tempRole', currentRole);
+          sessionStorage.setItem('tempPlate', plateInput || 'ABC-1234');
           auth.signInWithRedirect(provider);
         } else {
           alert("Erro ao conectar com a conta do Google: " + error.message);
@@ -330,15 +334,17 @@
       }
     }
 
-    // RESTAURA SESSÃO CASO RETORNE DO REDIRECIONAMENTO
+    // RECUPERA SESSÃO DE POPOUP/REDIRECT SEM BLOQUEIO
     auth.getRedirectResult().then((result) => {
       if (result && result.user) {
         const user = result.user;
+        const savedRole = sessionStorage.getItem('tempRole') || currentRole;
+        const savedPlate = sessionStorage.getItem('tempPlate') || 'ABC-1234';
+        currentRole = savedRole;
         let phone = user.phoneNumber || user.email || 'Google User';
-        let plate = document.getElementById('user-plate').value.trim() || 'ABC-1234';
-        entrarNoAppComDados(user.displayName, phone, plate);
+        entrarNoAppComDados(user.displayName, phone, savedPlate);
       }
-    }).catch((error) => console.log(error));
+    }).catch((err) => console.log("Erro Redirect Result:", err));
 
     function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
@@ -456,7 +462,7 @@
               driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                 .addTo(passengerMap)
                 .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
-                .bindTooltip(`🏍️️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+                .bindTooltip(`🏍 ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
@@ -470,7 +476,7 @@
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
           .addTo(driverMap)
-          .bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`)
+          .bindPopup(`🏍️️ <b>Sua Moto</b><br>${currentUser.name}`)
           .bindTooltip(`🏍️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
         
         dRouteLayerGroup = L.layerGroup().addTo(driverMap);
@@ -795,6 +801,7 @@
         }
       }
 
+      sessionStorage.clear();
       auth.signOut();
       location.reload();
     }
