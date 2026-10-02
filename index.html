@@ -8,9 +8,6 @@
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-  <!-- SDK do Google Identity (One Tap / Google Sign-In Nativo) -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     html, body { height: 100%; width: 100%; overflow: hidden; background: #212121; }
@@ -298,53 +295,47 @@
 
     function setRole(newRole) {
       currentRole = newRole;
+      localStorage.setItem('sjn_role', newRole);
       document.getElementById('tab-passenger').classList.toggle('active', newRole === 'passageiro');
       document.getElementById('tab-driver').classList.toggle('active', newRole === 'motorista');
       document.getElementById('group-phone').style.display = newRole === 'passageiro' ? 'block' : 'none';
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // LOGIN COM GOOGLE COMPATÍVEL COM CELULARES (POPUP + REDIRECT FALLBACK)
+    // CAPTURA AUTOMÁTICA DE SESSÃO APÓS O REDIRECIONAMENTO DO GOOGLE NO TELEMÓVEL
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
+        const savedPlate = localStorage.getItem('sjn_plate') || 'ABC-1234';
+        
+        currentRole = savedRole;
+        let phone = user.phoneNumber || user.email || 'Google User';
+
+        entrarNoAppComDados(user.displayName, phone, savedPlate);
+      }
+    });
+
+    // ENTAR COM GOOGLE
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
-      if (currentRole === 'motorista' && !plateInput) {
+      if (currentRole === 'motorista' && !plateInput && !localStorage.getItem('sjn_plate')) {
         alert('Motorista: Por favor, digite a Placa da sua moto antes de entrar com o Google.');
         return;
       }
 
+      if (plateInput) localStorage.setItem('sjn_plate', plateInput);
+      localStorage.setItem('sjn_role', currentRole);
+
       const provider = new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
 
       try {
-        const result = await auth.signInWithPopup(provider);
-        const user = result.user;
-        let phone = user.phoneNumber || user.email || 'Google User';
-        entrarNoAppComDados(user.displayName, phone, plateInput || 'ABC-1234');
+        await auth.signInWithRedirect(provider);
       } catch (error) {
-        console.error("Erro no Popup:", error);
-        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-          // Salva os dados temporariamente antes do redirecionamento
-          sessionStorage.setItem('tempRole', currentRole);
-          sessionStorage.setItem('tempPlate', plateInput || 'ABC-1234');
-          auth.signInWithRedirect(provider);
-        } else {
-          alert("Erro ao conectar com a conta do Google: " + error.message);
-        }
+        console.error("Erro no login Google:", error);
+        alert("Erro ao conectar com a conta do Google: " + error.message);
       }
     }
-
-    // RECUPERA SESSÃO DE POPOUP/REDIRECT SEM BLOQUEIO
-    auth.getRedirectResult().then((result) => {
-      if (result && result.user) {
-        const user = result.user;
-        const savedRole = sessionStorage.getItem('tempRole') || currentRole;
-        const savedPlate = sessionStorage.getItem('tempPlate') || 'ABC-1234';
-        currentRole = savedRole;
-        let phone = user.phoneNumber || user.email || 'Google User';
-        entrarNoAppComDados(user.displayName, phone, savedPlate);
-      }
-    }).catch((err) => console.log("Erro Redirect Result:", err));
 
     function entrarNoApp() {
       const name = document.getElementById('user-name').value.trim();
@@ -462,7 +453,7 @@
               driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
                 .addTo(passengerMap)
                 .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
-                .bindTooltip(`🏍 ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
@@ -476,7 +467,7 @@
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
           .addTo(driverMap)
-          .bindPopup(`🏍️️ <b>Sua Moto</b><br>${currentUser.name}`)
+          .bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`)
           .bindTooltip(`🏍️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
         
         dRouteLayerGroup = L.layerGroup().addTo(driverMap);
@@ -801,7 +792,8 @@
         }
       }
 
-      sessionStorage.clear();
+      localStorage.removeItem('sjn_role');
+      localStorage.removeItem('sjn_plate');
       auth.signOut();
       location.reload();
     }
