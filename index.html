@@ -304,7 +304,6 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // LISTENER AUTOMÁTICO DE SESSÃO
     auth.onAuthStateChanged((user) => {
       if (user) {
         const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
@@ -317,7 +316,6 @@
       }
     });
 
-    // TRATAMENTO DUAL DA AUTENTICAÇÃO
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
@@ -332,14 +330,12 @@
       const provider = new firebase.auth.GoogleAuthProvider();
 
       try {
-        // Tenta Pop-up direto
         const result = await auth.signInWithPopup(provider);
         const user = result.user;
         let phone = user.phoneNumber || user.email || 'Google User';
         entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
       } catch (error) {
         console.log("Fallback Redirect acionado:", error);
-        // Em celulares com pop-up bloqueado, aciona o redirecionamento
         auth.signInWithRedirect(provider);
       }
     }
@@ -615,6 +611,7 @@
       document.getElementById('status-box').style.color = '#d35400';
       document.getElementById('status-box').innerText = `⏳ Aguardando motorista aceitar... (Valor: R$ ${valorEstimado.toFixed(2).replace('.', ',')})`;
 
+      // ESCUTA A ATUALIZAÇÃO DA CORRIDA EXIBINDO O NOME DO MOTORISTA QUANDO ELE ACEITAR
       db.ref('corridas/' + activeRideId).on('value', (snapshot) => {
         const corrida = snapshot.val();
         if (!corrida) return;
@@ -623,7 +620,10 @@
 
         if (corrida.status === 'aceita') {
           const box = document.getElementById('status-box');
-          box.innerText = `✅ Motorista aceitou! Ele está a caminho. (Valor: R$ ${valorFormatado})`;
+          const nomeMotorista = corrida.motoristaNome || 'O motorista';
+          const placaMotorista = corrida.motoristaPlaca ? ` (Placa: ${corrida.motoristaPlaca})` : '';
+
+          box.innerText = `✅ ${nomeMotorista}${placaMotorista} aceitou a corrida e está a caminho! (Valor: R$ ${valorFormatado})`;
           box.style.color = '#27ae60';
         } else if (corrida.status === 'concluida') {
           alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
@@ -743,11 +743,16 @@
       }
     }
 
+    // ENVIA O NOME E A PLACA DO MOTORISTA QUANDO ELE ACEITA A CORRIDA
     function confirmarAceiteCorrida() {
       if (!pendingRide) return;
       activeRideId = pendingRide.id;
 
-      db.ref('corridas/' + activeRideId).update({ status: 'aceita' });
+      db.ref('corridas/' + activeRideId).update({ 
+        status: 'aceita',
+        motoristaNome: currentUser.name,
+        motoristaPlaca: currentUser.plate 
+      });
 
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
       document.getElementById('driver-request-card').style.display = 'none';
