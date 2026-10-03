@@ -226,7 +226,6 @@
     const db = firebase.database();
     const auth = firebase.auth();
 
-    // FORÇA A PERSISTÊNCIA LOCAL PARA DISPOSITIVOS MÓVEIS
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
     let currentRole = 'passageiro';
@@ -305,7 +304,7 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // LISTENER QUE ENTRA AUTOMATICAMENTE ASSIM QUE O FIREBASE CONFIRMA A AUTENTICAÇÃO
+    // LISTENER AUTOMÁTICO DE SESSÃO
     auth.onAuthStateChanged((user) => {
       if (user) {
         const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
@@ -318,6 +317,7 @@
       }
     });
 
+    // TRATAMENTO DUAL DA AUTENTICAÇÃO
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
@@ -332,10 +332,15 @@
       const provider = new firebase.auth.GoogleAuthProvider();
 
       try {
-        await auth.signInWithRedirect(provider);
+        // Tenta Pop-up direto
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        let phone = user.phoneNumber || user.email || 'Google User';
+        entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
       } catch (error) {
-        console.error("Erro no login Google:", error);
-        alert("Erro ao conectar com a conta do Google: " + error.message);
+        console.log("Fallback Redirect acionado:", error);
+        // Em celulares com pop-up bloqueado, aciona o redirecionamento
+        auth.signInWithRedirect(provider);
       }
     }
 
