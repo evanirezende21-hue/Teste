@@ -226,6 +226,9 @@
     const db = firebase.database();
     const auth = firebase.auth();
 
+    // FORÇA A PERSISTÊNCIA LOCAL PARA DISPOSITIVOS MÓVEIS
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
     let currentRole = 'passageiro';
     let currentUser = null;
     let activeRideId = null;
@@ -302,7 +305,7 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
-    // CAPTURA AUTOMÁTICA DE SESSÃO APÓS O REDIRECIONAMENTO DO GOOGLE NO TELEMÓVEL
+    // LISTENER QUE ENTRA AUTOMATICAMENTE ASSIM QUE O FIREBASE CONFIRMA A AUTENTICAÇÃO
     auth.onAuthStateChanged((user) => {
       if (user) {
         const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
@@ -315,7 +318,6 @@
       }
     });
 
-    // ENTAR COM GOOGLE
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
