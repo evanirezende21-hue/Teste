@@ -316,6 +316,7 @@
       }
     });
 
+    // TRATAMENTO DUAL COMPATÍVEL COM IPHONE (iOS SAFARI/CHROME)
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
@@ -329,14 +330,29 @@
 
       const provider = new firebase.auth.GoogleAuthProvider();
 
-      try {
-        const result = await auth.signInWithPopup(provider);
-        const user = result.user;
-        let phone = user.phoneNumber || user.email || 'Google User';
-        entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
-      } catch (error) {
-        console.log("Fallback Redirect acionado:", error);
-        auth.signInWithRedirect(provider);
+      // Detecta iOS (iPhone/iPad)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+      if (isIOS) {
+        // No iOS, o Pop-up direto com fallthrough é a única forma de evitar bloqueio do Safari
+        try {
+          const result = await auth.signInWithPopup(provider);
+          const user = result.user;
+          let phone = user.phoneNumber || user.email || 'Google User';
+          entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
+        } catch (error) {
+          console.log("Tentando Redirect iOS:", error);
+          auth.signInWithRedirect(provider);
+        }
+      } else {
+        try {
+          const result = await auth.signInWithPopup(provider);
+          const user = result.user;
+          let phone = user.phoneNumber || user.email || 'Google User';
+          entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
+        } catch (error) {
+          auth.signInWithRedirect(provider);
+        }
       }
     }
 
@@ -754,7 +770,6 @@
       document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
     }
 
-    // CONCLUI A CORRIDA SEM REMOVER O PASSAGEIRO DA BASE DE DADOS
     function finalizarCorrida() {
       if (!activeRideId) return;
 
