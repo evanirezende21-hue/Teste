@@ -611,7 +611,6 @@
       document.getElementById('status-box').style.color = '#d35400';
       document.getElementById('status-box').innerText = `⏳ Aguardando motorista aceitar... (Valor: R$ ${valorEstimado.toFixed(2).replace('.', ',')})`;
 
-      // ESCUTA A ATUALIZAÇÃO DA CORRIDA EXIBINDO O NOME DO MOTORISTA QUANDO ELE ACEITAR
       db.ref('corridas/' + activeRideId).on('value', (snapshot) => {
         const corrida = snapshot.val();
         if (!corrida) return;
@@ -634,11 +633,6 @@
     }
 
     function resetarEstadoPassageiro() {
-      if (currentUser && currentUser.phone) {
-        const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '');
-        if (keyPhone) db.ref('passageiros/' + keyPhone).remove();
-      }
-
       activeRideId = null;
       destino = null;
       if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
@@ -743,7 +737,6 @@
       }
     }
 
-    // ENVIA O NOME E A PLACA DO MOTORISTA QUANDO ELE ACEITA A CORRIDA
     function confirmarAceiteCorrida() {
       if (!pendingRide) return;
       activeRideId = pendingRide.id;
@@ -761,14 +754,11 @@
       document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
     }
 
+    // CONCLUI A CORRIDA SEM REMOVER O PASSAGEIRO DA BASE DE DADOS
     function finalizarCorrida() {
       if (!activeRideId) return;
 
       const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
-
-      if (pendingRide && pendingRide.passageiroKey) {
-        db.ref('passageiros/' + pendingRide.passageiroKey).remove();
-      }
 
       const rideRef = db.ref('corridas/' + activeRideId);
       rideRef.update({ status: 'concluida' }).then(() => {
