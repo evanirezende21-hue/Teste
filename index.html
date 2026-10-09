@@ -316,7 +316,6 @@
       }
     });
 
-    // TRATAMENTO DUAL COMPATÍVEL COM IPHONE (iOS SAFARI/CHROME)
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
       
@@ -329,12 +328,9 @@
       localStorage.setItem('sjn_role', currentRole);
 
       const provider = new firebase.auth.GoogleAuthProvider();
-
-      // Detecta iOS (iPhone/iPad)
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
       if (isIOS) {
-        // No iOS, o Pop-up direto com fallthrough é a única forma de evitar bloqueio do Safari
         try {
           const result = await auth.signInWithPopup(provider);
           const user = result.user;
@@ -580,7 +576,17 @@
 
         if (data.routes && data.routes.length > 0) {
           distanciaKm = data.routes[0].distance / 1000;
-          valorEstimado = TAXA_MINIMA + (distanciaKm * PRECO_POR_KM);
+          
+          // CÁLCULO DO PREÇO BRUTO
+          let valorBruto = TAXA_MINIMA + (distanciaKm * PRECO_POR_KM);
+
+          // ARREDONDAMENTO PARA O NÚMERO INTEIRO MAIS PRÓXIMO (SEM CENTAVOS)
+          valorEstimado = Math.round(valorBruto);
+
+          // Garante que não fique abaixo de R$ 10,00
+          if (valorEstimado < TAXA_MINIMA) {
+            valorEstimado = TAXA_MINIMA;
+          }
 
           document.getElementById('instruction-text').style.display = 'none';
           document.getElementById('ride-details').style.display = 'block';
