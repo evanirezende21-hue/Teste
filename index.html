@@ -404,7 +404,6 @@
       if (!passengerMap) {
         passengerMap = L.map('passenger-map', { zoomControl: true }).setView(origem, 16);
         
-        // MAPA OFICIAL DE RUA LEAFLET (OPENSTREETMAP)
         L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { 
           maxZoom: 20,
           attribution: '&copy; OpenStreetMap' 
@@ -490,7 +489,6 @@
       if (!driverMap) {
         driverMap = L.map('driver-map', { zoomControl: true }).setView(driverPos, 16);
         
-        // MAPA OFICIAL DE RUA LEAFLET (OPENSTREETMAP)
         L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { 
           maxZoom: 20,
           attribution: '&copy; OpenStreetMap' 
@@ -714,12 +712,17 @@
       if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
       if (pRouteLine) { passengerMap.removeLayer(pRouteLine); pRouteLine = null; }
       
+      // APAGA A LINHA VERDE DO TRAJETO NO MAPA DO CLIENTE
       if (pDriverToPassengerLine) { 
         passengerMap.removeLayer(pDriverToPassengerLine); 
         pDriverToPassengerLine = null; 
       }
       
-      document.getElementById('status-box').style.display = 'none';
+      // LIMPA E REMOVE AS MENSAGENS DE STATUS DA TELA DO CLIENTE
+      const statusBox = document.getElementById('status-box');
+      statusBox.style.display = 'none';
+      statusBox.innerText = '';
+      
       document.getElementById('instruction-text').style.display = 'block';
       document.getElementById('ride-details').style.display = 'none';
     }
