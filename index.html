@@ -711,7 +711,7 @@
       db.ref('corridas/' + activeRideId).on('value', (snapshot) => {
         const corrida = snapshot.val();
         
-        // Se a corrida for apagada/concluída, reseta instantaneamente a tela do cliente sem popup
+        // Se a corrida for apagada/concluida, limpa instantaneamente a tela do cliente
         if (!corrida || corrida.status === 'concluida') {
           db.ref('corridas/' + activeRideId).off();
           resetarEstadoPassageiro();
@@ -809,7 +809,7 @@
           currentRideStatus = 'solicitada';
           const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
           
-          document.getElementById('driver-empty-box').style.display = 'none';
+          document.getElementById('driver-empty-box').style.display = 'block';
           document.getElementById('driver-request-card').style.display = 'block';
           document.getElementById('driver-pickup-card').style.display = 'none';
           document.getElementById('driver-active-card').style.display = 'none';
@@ -861,14 +861,13 @@
 
       try {
         if (currentRideStatus === 'aceita') {
-          // MOTORISTA A CAMINHO DO PASSAGEIRO
           const res1 = await fetch(urlAtePassageiro);
           const data1 = await res1.json();
 
           if (dRouteLayerGroup && data1.routes && data1.routes.length > 0) {
             const coordsAtePassageiro = data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
             L.polyline(coordsAtePassageiro, { 
-              color: '#00e676', // VERDE LIMA (Até ao cliente)
+              color: '#00e676', 
               weight: 6,
               dashArray: '6, 6',
               opacity: 0.95 
@@ -876,7 +875,6 @@
           }
 
         } else if (currentRideStatus === 'em_andamento') {
-          // PASSAGEIRO EMBARCOU: MOSTRA ROTA DA MOTO ATÉ AO DESTINO FINAL
           const urlMotoAteDestino = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
           const res3 = await fetch(urlMotoAteDestino);
           const data3 = await res3.json();
@@ -884,7 +882,7 @@
           if (dRouteLayerGroup && data3.routes && data3.routes.length > 0) {
             const coordsMotoAteDestino = data3.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
             L.polyline(coordsMotoAteDestino, { 
-              color: '#2980b9', // AZUL
+              color: '#2980b9', 
               weight: 6,
               dashArray: '8, 8',
               opacity: 0.9 
@@ -892,7 +890,6 @@
           }
 
         } else {
-          // SOLICITAÇÃO INICIAL (PREVISÃO DE AMBAS)
           const [res1, res2] = await Promise.all([fetch(urlAtePassageiro), fetch(urlAteDestino)]);
           const data1 = await res1.json();
           const data2 = await res2.json();
@@ -975,15 +972,11 @@
 
       const rideRef = db.ref('corridas/' + activeRideId);
       
-      // Atualiza para concluída e apaga do banco imediatamente para resetar a tela do cliente sem travar
-      rideRef.update({ status: 'concluida' }).then(() => {
-        rideRef.remove();
-      });
+      // Apaga o registro do banco para limpar instantaneamente o cliente e o motorista
+      rideRef.remove();
 
+      // LIMPEZA COMPLETA DA TELA DO MOTORISTA
       limparRotasMapaMotorista();
-
-      alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}`);
-
       activeRideId = null;
       pendingRide = null;
       currentRideStatus = null;
@@ -992,6 +985,8 @@
       document.getElementById('driver-active-card').style.display = 'none';
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-empty-box').style.display = 'block';
+
+      alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}`);
     }
 
     function sairDaConta() {
