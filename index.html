@@ -1,3 +1,4 @@
+HTML
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -234,6 +235,7 @@
     let pendingRide = null;
     let wakeLock = null;
     let lastNotifiedRideId = null;
+    let activeDriverTrackingRef = null; // REFERÊNCIA PARA CANCELAR O RASTREIO DO MOTORISTA NO CLIENTE
 
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine, pDriverToPassengerLine;
@@ -690,7 +692,13 @@
 
           if (corrida.motoristaPlaca) {
             const keyPlate = corrida.motoristaPlaca.replace(/[^a-zA-Z0-9]/g, '');
-            db.ref('motoristas/' + keyPlate).on('value', (mSnap) => {
+            
+            if (activeDriverTrackingRef) {
+              activeDriverTrackingRef.off();
+            }
+
+            activeDriverTrackingRef = db.ref('motoristas/' + keyPlate);
+            activeDriverTrackingRef.on('value', (mSnap) => {
               const mData = mSnap.val();
               if (mData && mData.lat && mData.lng) {
                 desenharRotaMotoristaAtePassageiroNoCliente(mData.lat, mData.lng);
@@ -707,22 +715,36 @@
     }
 
     function resetarEstadoPassageiro() {
-      activeRideId = null;
-      destino = null;
-      if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
-      if (pRouteLine) { passengerMap.removeLayer(pRouteLine); pRouteLine = null; }
-      
-      // APAGA A LINHA VERDE DO TRAJETO NO MAPA DO CLIENTE
+      // 1. DESCONECTA O OUVINTE DE POSIÇÃO DO MOTORISTA NO FIREBASE
+      if (activeDriverTrackingRef) {
+        activeDriverTrackingRef.off();
+        activeDriverTrackingRef = null;
+      }
+
+      // 2. APAGA A LINHA VERDE DO TRAJETO E REMOVE DO MAPA
       if (pDriverToPassengerLine) { 
         passengerMap.removeLayer(pDriverToPassengerLine); 
         pDriverToPassengerLine = null; 
       }
-      
-      // LIMPA E REMOVE AS MENSAGENS DE STATUS DA TELA DO CLIENTE
+
+      // 3. REMOVE MARCADORES DE DESTINO E LINHAS DE ROTA DA CORRIDA
+      if (pDestMarker) { 
+        passengerMap.removeLayer(pDestMarker); 
+        pDestMarker = null; 
+      }
+      if (pRouteLine) { 
+        passengerMap.removeLayer(pRouteLine); 
+        pRouteLine = null; 
+      }
+
+      activeRideId = null;
+      destino = null;
+
+      // 4. LIMPA A MENSAGEM DA TELA DO CLIENTE E RESTAURA O INSTRUCTS INICIAL
       const statusBox = document.getElementById('status-box');
       statusBox.style.display = 'none';
       statusBox.innerText = '';
-      
+
       document.getElementById('instruction-text').style.display = 'block';
       document.getElementById('ride-details').style.display = 'none';
     }
