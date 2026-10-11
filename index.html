@@ -710,7 +710,13 @@
 
       db.ref('corridas/' + activeRideId).on('value', (snapshot) => {
         const corrida = snapshot.val();
-        if (!corrida) return;
+        
+        // Se a corrida for apagada/concluída, reseta instantaneamente a tela do cliente sem popup
+        if (!corrida || corrida.status === 'concluida') {
+          db.ref('corridas/' + activeRideId).off();
+          resetarEstadoPassageiro();
+          return;
+        }
 
         const valorFormatado = (corrida.valor || valorEstimado || 0).toFixed(2).replace('.', ',');
 
@@ -749,11 +755,6 @@
 
           box.innerText = `✅ Viagem em andamento com ${nomeMotorista}! A caminho do destino. (Valor: R$ ${valorFormatado})`;
           box.style.color = '#27ae60';
-
-        } else if (corrida.status === 'concluida') {
-          alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
-          db.ref('corridas/' + activeRideId).off();
-          resetarEstadoPassageiro();
         }
       });
     }
@@ -973,8 +974,10 @@
       const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
 
       const rideRef = db.ref('corridas/' + activeRideId);
+      
+      // Atualiza para concluída e apaga do banco imediatamente para resetar a tela do cliente sem travar
       rideRef.update({ status: 'concluida' }).then(() => {
-        setTimeout(() => rideRef.remove(), 1000);
+        rideRef.remove();
       });
 
       limparRotasMapaMotorista();
