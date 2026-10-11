@@ -878,7 +878,6 @@
 
       try {
         if (currentRideStatus === 'aceita') {
-          // Apenas marcador verde de embarque enquanto vai buscar o passageiro
           dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
             .addTo(driverMap)
             .bindPopup("<b>Embarque Passageiro</b>")
@@ -898,7 +897,6 @@
           }
 
         } else if (currentRideStatus === 'em_andamento') {
-          // PASSAGEIRO EMBARCOU: ADICIONA APENAS O DESTINO FINAL (O MARCADOR VERDE É REMOVIDO)
           dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon })
             .addTo(driverMap)
             .bindPopup("<b>Destino Final</b>")
@@ -919,7 +917,6 @@
           }
 
         } else {
-          // SOLICITAÇÃO INICIAL (EXIBE AMBOS OS MARCADORES)
           dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
             .addTo(driverMap)
             .bindPopup("<b>Embarque Passageiro</b>")
