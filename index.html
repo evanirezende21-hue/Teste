@@ -613,7 +613,6 @@
       }
     }
 
-    // DESENHA A ROTA DINÂMICA VERDE LIMA QUE SUME CONFORME O MOTORISTA AVANÇA
     async function desenharRotaMotoristaAtePassageiroNoCliente(motoristaLat, motoristaLng) {
       if (!passengerMap || !origem) return;
 
@@ -631,7 +630,7 @@
           }
 
           pDriverToPassengerLine = L.polyline(coordinates, { 
-            color: '#00e676', // VERDE LIMA
+            color: '#00e676',
             weight: 6,
             dashArray: '6, 6',
             opacity: 0.95 
@@ -704,7 +703,12 @@
       destino = null;
       if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
       if (pRouteLine) { passengerMap.removeLayer(pRouteLine); pRouteLine = null; }
-      if (pDriverToPassengerLine) { passengerMap.removeLayer(pDriverToPassengerLine); pDriverToPassengerLine = null; }
+      
+      // APAGA A LINHA VERDE DO TRAJETO QUANDO A CORRIDA É ENCERRADA
+      if (pDriverToPassengerLine) { 
+        passengerMap.removeLayer(pDriverToPassengerLine); 
+        pDriverToPassengerLine = null; 
+      }
       
       document.getElementById('status-box').style.display = 'none';
       document.getElementById('instruction-text').style.display = 'block';
@@ -758,7 +762,6 @@
       if (dRouteLayerGroup) { dRouteLayerGroup.clearLayers(); }
     }
 
-    // TRAÇO DINÂMICO QUE RECALCULA E SUME À MEDIDA QUE O MOTORISTA AVANÇA
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro, ajustarZoom = false) {
       limparRotasMapaMotorista();
 
@@ -781,18 +784,16 @@
         const data2 = await res2.json();
 
         if (dRouteLayerGroup) {
-          // LINHA 1 (VERDE LIMA DINÂMICA): RECALCULADA DA POSIÇÃO DA MOTO ATÉ O PASSAGEIRO
           if (data1.routes && data1.routes.length > 0) {
             const coordsAtePassageiro = data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
             L.polyline(coordsAtePassageiro, { 
-              color: '#00e676', // VERDE LIMA
+              color: '#00e676',
               weight: 6,
               dashArray: '6, 6',
               opacity: 0.95 
             }).addTo(dRouteLayerGroup);
           }
 
-          // LINHA 2 (AZUL): PASSAGEIRO ATÉ O DESTINO
           if (data2.routes && data2.routes.length > 0) {
             const coordsAteDestino = data2.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
             L.polyline(coordsAteDestino, { 
