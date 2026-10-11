@@ -428,10 +428,25 @@
           rotateControl: false
         }).setView(origem, 16);
         
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 19,
-          attribution: 'Tiles &copy; Esri'
-        }).addTo(passengerMap);
+        // Camadas Estilo Google Maps (Padrão de Ruas e Satélite)
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: '&copy; Google Maps'
+        });
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: '&copy; Google Satellite'
+        });
+
+        googleStreets.addTo(passengerMap);
+
+        L.control.layers({
+          "Mapa de Ruas (Google)": googleStreets,
+          "Satélite (Google)": googleSat
+        }, {}, { position: 'topright' }).addTo(passengerMap);
         
         pUserMarker = L.marker(origem, { icon: blueIcon })
           .addTo(passengerMap)
@@ -518,10 +533,25 @@
           rotateControl: false
         }).setView(driverPos, 16);
         
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 19,
-          attribution: 'Tiles &copy; Esri'
-        }).addTo(driverMap);
+        // Camadas Estilo Google Maps para o Motorista
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: '&copy; Google Maps'
+        });
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: '&copy; Google Satellite'
+        });
+
+        googleStreets.addTo(driverMap);
+
+        L.control.layers({
+          "Mapa de Ruas (Google)": googleStreets,
+          "Satélite (Google)": googleSat
+        }, {}, { position: 'topright' }).addTo(driverMap);
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
           .addTo(driverMap)
@@ -711,7 +741,6 @@
       db.ref('corridas/' + activeRideId).on('value', (snapshot) => {
         const corrida = snapshot.val();
         
-        // Se a corrida for apagada/concluida, limpa instantaneamente a tela do cliente
         if (!corrida || corrida.status === 'concluida') {
           db.ref('corridas/' + activeRideId).off();
           resetarEstadoPassageiro();
@@ -971,11 +1000,8 @@
       const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
 
       const rideRef = db.ref('corridas/' + activeRideId);
-      
-      // Apaga o registro do banco para limpar instantaneamente o cliente e o motorista
       rideRef.remove();
 
-      // LIMPEZA COMPLETA DA TELA DO MOTORISTA
       limparRotasMapaMotorista();
       activeRideId = null;
       pendingRide = null;
