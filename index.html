@@ -285,6 +285,7 @@
       }
     }
 
+    // FUNÇÃO QUE MANTÉM A TELA ACESA (WAKELOCK)
     async function manterTelaAcesa() {
       try {
         if ('wakeLock' in navigator) {
@@ -294,6 +295,13 @@
         console.log("Erro no WakeLock:", err.message);
       }
     }
+
+    // REATIVA O WAKELOCK CASO O MOTORISTA MINIMIZE OU RETORNE AO NAVEGADOR
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && currentRole === 'motorista') {
+        manterTelaAcesa();
+      }
+    });
 
     function setRole(newRole) {
       currentRole = newRole;
@@ -577,13 +585,9 @@
         if (data.routes && data.routes.length > 0) {
           distanciaKm = data.routes[0].distance / 1000;
           
-          // CÁLCULO DO PREÇO BRUTO
           let valorBruto = TAXA_MINIMA + (distanciaKm * PRECO_POR_KM);
-
-          // ARREDONDAMENTO PARA O NÚMERO INTEIRO MAIS PRÓXIMO (SEM CENTAVOS)
           valorEstimado = Math.round(valorBruto);
 
-          // Garante que não fique abaixo de R$ 10,00
           if (valorEstimado < TAXA_MINIMA) {
             valorEstimado = TAXA_MINIMA;
           }
@@ -759,9 +763,13 @@
       }
     }
 
+    // CONFIRMA O ACEITE DA CORRIDA E FORÇA A TELA A FICAR ACESA
     function confirmarAceiteCorrida() {
       if (!pendingRide) return;
       activeRideId = pendingRide.id;
+
+      // REATIVA A TELA ACESA NO TOQUE DO MOTORISTA
+      manterTelaAcesa();
 
       db.ref('corridas/' + activeRideId).update({ 
         status: 'aceita',
