@@ -66,6 +66,7 @@
 
     .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-success { background: #27ae60; color: #fff; }
 
     .btn-google {
       width: 100%;
@@ -186,6 +187,7 @@
       🔎 Aguardando solicitações de corrida...
     </div>
 
+    <!-- CARD SOLICITAÇÃO -->
     <div class="bottom-card" id="driver-request-card" style="display: none;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <strong style="font-size: 16px; color: #333;">Nova Solicitação!</strong>
@@ -195,9 +197,20 @@
       <button class="btn-primary" id="btn-accept-ride" onclick="confirmarAceiteCorrida()">ACEITAR CORRIDA</button>
     </div>
 
+    <!-- CARD CAMINHO EMBARQUE -->
+    <div class="bottom-card" id="driver-pickup-card" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <div style="color: #d35400; font-weight: bold;">🛵 A caminho do Passageiro</div>
+        <span class="price-tag" id="driver-pickup-ride-price" style="font-size: 20px;">R$ 0,00</span>
+      </div>
+      <div class="info-text" id="driver-pickup-passenger-info"><b>Passageiro:</b> --</div>
+      <button class="btn-primary btn-success" id="btn-start-ride" onclick="iniciarViagemComPassageiro()">INICIAR VIAGEM (PASSAGEIRO EMBARCOU)</button>
+    </div>
+
+    <!-- CARD EM ANDAMENTO -->
     <div class="bottom-card" id="driver-active-card" style="display: none;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-        <div style="color: #27ae60; font-weight: bold;">✅ Corrida Aceita - Em Andamento</div>
+        <div style="color: #27ae60; font-weight: bold;">✅ Viagem em Andamento</div>
         <span class="price-tag" id="driver-active-ride-price" style="font-size: 20px;">R$ 0,00</span>
       </div>
       <div class="info-text" id="driver-active-passenger-info"><b>Passageiro:</b> --</div>
@@ -236,6 +249,7 @@
     let currentUser = null;
     let activeRideId = null;
     let pendingRide = null;
+    let currentRideStatus = null;
     let wakeLock = null;
     let lastNotifiedRideId = null;
     let activeDriverTrackingRef = null;
@@ -414,7 +428,6 @@
           rotateControl: false
         }).setView(origem, 16);
         
-        // Camada de ruas de alta nitidez Esri World Street Map
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
           maxZoom: 19,
           attribution: 'Tiles &copy; Esri'
@@ -505,7 +518,6 @@
           rotateControl: false
         }).setView(driverPos, 16);
         
-        // Camada de ruas de alta nitidez Esri World Street Map
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
           maxZoom: 19,
           attribution: 'Tiles &copy; Esri'
@@ -707,8 +719,8 @@
           const nomeMotorista = corrida.motoristaNome || 'O motorista';
           const placaMotorista = corrida.motoristaPlaca ? ` (Placa: ${corrida.motoristaPlaca})` : '';
 
-          box.innerText = `✅ ${nomeMotorista}${placaMotorista} aceitou a corrida e está a caminho! (Valor: R$ ${valorFormatado})`;
-          box.style.color = '#27ae60';
+          box.innerText = `🛵 ${nomeMotorista}${placaMotorista} aceitou a corrida e está a caminho do seu local! (Valor: R$ ${valorFormatado})`;
+          box.style.color = '#d35400';
 
           if (corrida.motoristaPlaca) {
             const keyPlate = corrida.motoristaPlaca.replace(/[^a-zA-Z0-9]/g, '');
@@ -725,6 +737,18 @@
               }
             });
           }
+
+        } else if (corrida.status === 'em_andamento') {
+          const box = document.getElementById('status-box');
+          const nomeMotorista = corrida.motoristaNome || 'O motorista';
+          
+          if (pDriverToPassengerLine) {
+            passengerMap.removeLayer(pDriverToPassengerLine);
+            pDriverToPassengerLine = null;
+          }
+
+          box.innerText = `✅ Viagem em andamento com ${nomeMotorista}! A caminho do destino. (Valor: R$ ${valorFormatado})`;
+          box.style.color = '#27ae60';
 
         } else if (corrida.status === 'concluida') {
           alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
@@ -781,10 +805,14 @@
 
         if (corridaEncontrada) {
           pendingRide = corridaEncontrada;
+          currentRideStatus = 'solicitada';
           const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
           
           document.getElementById('driver-empty-box').style.display = 'none';
           document.getElementById('driver-request-card').style.display = 'block';
+          document.getElementById('driver-pickup-card').style.display = 'none';
+          document.getElementById('driver-active-card').style.display = 'none';
+
           document.getElementById('driver-ride-price').innerText = `R$ ${valorFormatado}`;
           document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
@@ -797,10 +825,12 @@
 
         } else if (!activeRideId) {
           pendingRide = null;
+          currentRideStatus = null;
           lastNotifiedRideId = null;
           limparRotasMapaMotorista();
           document.getElementById('driver-empty-box').style.display = 'block';
           document.getElementById('driver-request-card').style.display = 'none';
+          document.getElementById('driver-pickup-card').style.display = 'none';
           document.getElementById('driver-active-card').style.display = 'none';
         }
       });
@@ -829,34 +859,68 @@
       const urlAteDestino = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
 
       try {
-        const [res1, res2] = await Promise.all([fetch(urlAtePassageiro), fetch(urlAteDestino)]);
-        const data1 = await res1.json();
-        const data2 = await res2.json();
+        if (currentRideStatus === 'aceita') {
+          // MOTORISTA A CAMINHO DO PASSAGEIRO
+          const res1 = await fetch(urlAtePassageiro);
+          const data1 = await res1.json();
 
-        if (dRouteLayerGroup) {
-          if (data1.routes && data1.routes.length > 0) {
+          if (dRouteLayerGroup && data1.routes && data1.routes.length > 0) {
             const coordsAtePassageiro = data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
             L.polyline(coordsAtePassageiro, { 
-              color: '#00e676', // VERDE LIMA
+              color: '#00e676', // VERDE LIMA (Até ao cliente)
               weight: 6,
               dashArray: '6, 6',
               opacity: 0.95 
             }).addTo(dRouteLayerGroup);
           }
 
-          if (data2.routes && data2.routes.length > 0) {
-            const coordsAteDestino = data2.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            L.polyline(coordsAteDestino, { 
-              color: '#2980b9', 
+        } else if (currentRideStatus === 'em_andamento') {
+          // PASSAGEIRO EMBARCOU: MOSTRA ROTA DA MOTO ATÉ AO DESTINO FINAL
+          const urlMotoAteDestino = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
+          const res3 = await fetch(urlMotoAteDestino);
+          const data3 = await res3.json();
+
+          if (dRouteLayerGroup && data3.routes && data3.routes.length > 0) {
+            const coordsMotoAteDestino = data3.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            L.polyline(coordsMotoAteDestino, { 
+              color: '#2980b9', // AZUL
               weight: 6,
-              dashArray: '10, 10',
-              opacity: 0.85 
+              dashArray: '8, 8',
+              opacity: 0.9 
             }).addTo(dRouteLayerGroup);
           }
 
-          if (ajustarZoom) {
-            driverMap.fitBounds(L.featureGroup([dSelfMarker, dOrigMarker, dDestMarker]).getBounds(), { padding: [50, 50] });
+        } else {
+          // SOLICITAÇÃO INICIAL (PREVISÃO DE AMBAS)
+          const [res1, res2] = await Promise.all([fetch(urlAtePassageiro), fetch(urlAteDestino)]);
+          const data1 = await res1.json();
+          const data2 = await res2.json();
+
+          if (dRouteLayerGroup) {
+            if (data1.routes && data1.routes.length > 0) {
+              const coordsAtePassageiro = data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+              L.polyline(coordsAtePassageiro, { 
+                color: '#00e676', 
+                weight: 6,
+                dashArray: '6, 6',
+                opacity: 0.95 
+              }).addTo(dRouteLayerGroup);
+            }
+
+            if (data2.routes && data2.routes.length > 0) {
+              const coordsAteDestino = data2.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+              L.polyline(coordsAteDestino, { 
+                color: '#2980b9', 
+                weight: 6,
+                dashArray: '10, 10',
+                opacity: 0.85 
+              }).addTo(dRouteLayerGroup);
+            }
           }
+        }
+
+        if (ajustarZoom) {
+          driverMap.fitBounds(L.featureGroup([dSelfMarker, dOrigMarker, dDestMarker]).getBounds(), { padding: [50, 50] });
         }
       } catch (e) {
         console.error("Erro ao desenhar rotas do motorista:", e);
@@ -866,6 +930,7 @@
     function confirmarAceiteCorrida() {
       if (!pendingRide) return;
       activeRideId = pendingRide.id;
+      currentRideStatus = 'aceita';
 
       manterTelaAcesa();
 
@@ -877,9 +942,29 @@
 
       const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
       document.getElementById('driver-request-card').style.display = 'none';
+      document.getElementById('driver-pickup-card').style.display = 'block';
+      document.getElementById('driver-active-card').style.display = 'none';
+
+      document.getElementById('driver-pickup-ride-price').innerText = `R$ ${valorFormatado}`;
+      document.getElementById('driver-pickup-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
+
+      exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng], true);
+    }
+
+    function iniciarViagemComPassageiro() {
+      if (!activeRideId || !pendingRide) return;
+      currentRideStatus = 'em_andamento';
+
+      db.ref('corridas/' + activeRideId).update({ status: 'em_andamento' });
+
+      const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
+      document.getElementById('driver-pickup-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'block';
+
       document.getElementById('driver-active-ride-price').innerText = `R$ ${valorFormatado}`;
       document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
+
+      exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng], true);
     }
 
     function finalizarCorrida() {
@@ -898,7 +983,9 @@
 
       activeRideId = null;
       pendingRide = null;
+      currentRideStatus = null;
 
+      document.getElementById('driver-pickup-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'none';
       document.getElementById('driver-request-card').style.display = 'none';
       document.getElementById('driver-empty-box').style.display = 'block';
