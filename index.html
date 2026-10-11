@@ -210,11 +210,6 @@
   <!-- Leaflet Rotate JS -->
   <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
 
-  <!-- Google Maps API (Com a chave fornecida) -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCCQ7AkXO2GKKYFvGWNQC0mBVWSfG8Z_r8"></script>
-  <!-- Leaflet Google Mutant (Integra o mapa nativo do Google Maps dentro do Leaflet) -->
-  <script src="https://unpkg.com/leaflet.gridlayer.googlemutant@latest/Leaflet.GoogleMutant.js"></script>
-
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -419,10 +414,10 @@
           rotateControl: false
         }).setView(origem, 16);
         
-        // Camada oficial do Google Maps Mutant
-        L.gridLayer.googleMutant({
-          type: 'roadmap',
-          maxZoom: 19
+        // Camada de ruas de alta nitidez Esri World Street Map
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19,
+          attribution: 'Tiles &copy; Esri'
         }).addTo(passengerMap);
         
         pUserMarker = L.marker(origem, { icon: blueIcon })
@@ -510,10 +505,10 @@
           rotateControl: false
         }).setView(driverPos, 16);
         
-        // Camada oficial do Google Maps Mutant
-        L.gridLayer.googleMutant({
-          type: 'roadmap',
-          maxZoom: 19
+        // Camada de ruas de alta nitidez Esri World Street Map
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19,
+          attribution: 'Tiles &copy; Esri'
         }).addTo(driverMap);
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
