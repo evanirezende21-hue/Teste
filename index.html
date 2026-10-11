@@ -403,12 +403,16 @@
 
     function initPassengerMap() {
       if (!passengerMap) {
-        passengerMap = L.map('passenger-map', { zoomControl: true }).setView(origem, 16);
+        // ROTAÇÃO DESTRAVADA: Permite gestos de pinça/dois dedos e toque sem travar o Norte
+        passengerMap = L.map('passenger-map', { 
+          zoomControl: true,
+          touchRotate: true,
+          rotate: true
+        }).setView(origem, 16);
         
-        // MAPA ESTILO GOOGLE STREETS / ESRI COM Nomes de Ruas Limpos e Alta Precisão
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
           maxZoom: 19,
-          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom'
+          attribution: 'Tiles &copy; Esri'
         }).addTo(passengerMap);
         
         pUserMarker = L.marker(origem, { icon: blueIcon })
@@ -489,12 +493,16 @@
 
     function initDriverMapBase() {
       if (!driverMap) {
-        driverMap = L.map('driver-map', { zoomControl: true }).setView(driverPos, 16);
+        // ROTAÇÃO DESTRAVADA: Permite gestos de pinça/dois dedos e toque sem travar o Norte
+        driverMap = L.map('driver-map', { 
+          zoomControl: true,
+          touchRotate: true,
+          rotate: true
+        }).setView(driverPos, 16);
         
-        // MAPA ESTILO GOOGLE STREETS / ESRI COM Nomes de Ruas Limpos e Alta Precisão
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
           maxZoom: 19,
-          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom'
+          attribution: 'Tiles &copy; Esri'
         }).addTo(driverMap);
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
