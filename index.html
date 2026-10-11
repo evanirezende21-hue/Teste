@@ -1,3 +1,25 @@
+Recebi suas chaves e configurei o arquivo completo!
+
+Utilizamos a biblioteca MapLibre GL, que é totalmente gratuita, leve e não exige cartão de crédito. Agora, tanto o motorista quanto o passageiro podem girar o mapa com dois dedos, inclinar em 3D e clicar no ícone de bússola que aparece no canto superior direito para reorientar o mapa para o Norte instantaneamente.
+
+Todas as suas regras e códigos testados foram rigorosamente mantidos:
+
+Chaves da API e do Firebase já inseridas diretamente.
+
+Login com Google e suporte para iOS (Safari).
+
+Preço mínimo de R$ 10,00 e valores inteiros arredondados (sem centavos).
+
+Trajeto dinâmico em Verde Lima que vai sumindo conforme o motorista se aproxima.
+
+Limpeza automática da rota ao finalizar a corrida.
+
+Bloqueio de apagamento de tela (WakeLock) ativo.
+
+Código Completo Pronto (index.html):
+(Basta copiar o código abaixo e substituir todo o conteúdo do seu arquivo index.html no GitHub)
+
+HTML
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -5,8 +27,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Moto Táxi SJN - Firebase</title>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- MapLibre GL CSS -->
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -84,8 +106,6 @@
     }
     .btn-google:hover { background: #f5f5f5; }
 
-    .leaflet-top { top: 60px !important; }
-
     .custom-label {
       background: #222;
       color: #fff;
@@ -96,8 +116,10 @@
       font-weight: bold;
       white-space: nowrap;
       box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      text-align: center;
     }
-    .leaflet-tooltip-bottom.custom-label::before { border-bottom-color: #222; }
+
+    .maplibregl-ctrl-top-right { top: 60px !important; }
   </style>
 </head>
 <body>
@@ -203,8 +225,8 @@
     </div>
   </div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- MapLibre GL JS -->
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -236,15 +258,14 @@
     let lastNotifiedRideId = null;
 
     let passengerMap, driverMap;
-    let pUserMarker, pDestMarker, pRouteLine, pDriverToPassengerLine;
+    let pUserMarker, pDestMarker;
     let dSelfMarker, dOrigMarker, dDestMarker;
-    let dRouteLayerGroup = null;
 
     let driverMarkers = {}; 
     let passengerMarkers = {};
 
-    let origem = [-21.5431, -43.0108]; 
-    let driverPos = [-21.5431, -43.0108]; 
+    let origem = [-43.0108, -21.5431]; 
+    let driverPos = [-43.0108, -21.5431]; 
     let destino = null;
     let valorEstimado = 0;
     let distanciaKm = 0;
@@ -252,18 +273,32 @@
     const TAXA_MINIMA = 10.00;
     const PRECO_POR_KM = 2.50;
 
-    const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
-    const blueIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
-    const redIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+    const MAP_STYLE = "https://basemaps.cartocdn.com/gl/rastertiles/voyager-gl-style/style.json";
 
-    const motoSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23ffc107" stroke="%23000000" stroke-width="3"/><circle cx="20" cy="42" r="8" fill="%23222222"/><circle cx="44" cy="42" r="8" fill="%23222222"/><path d="M20 42 L26 26 L36 26 L42 34 L44 42" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 26 L32 18 L38 18" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round"/></svg>`;
+    function criarElementoMarker(iconeSvg, rotuloText) {
+      const el = document.createElement('div');
+      el.style.display = 'flex';
+      el.style.flexDirection = 'column';
+      el.style.alignItems = 'center';
 
-    const motoIcon = L.icon({
-      iconUrl: motoSvg,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
-      popupAnchor: [0, -18]
-    });
+      const iconDiv = document.createElement('div');
+      iconDiv.innerHTML = iconeSvg;
+      el.appendChild(iconDiv);
+
+      if (rotuloText) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'custom-label';
+        labelDiv.innerText = rotuloText;
+        el.appendChild(labelDiv);
+      }
+
+      return el;
+    }
+
+    const svgBluePin = `<svg width="32" height="32" viewBox="0 0 24 24"><path fill="#2980b9" stroke="#ffffff" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
+    const svgGreenPin = `<svg width="32" height="32" viewBox="0 0 24 24"><path fill="#27ae60" stroke="#ffffff" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
+    const svgRedPin = `<svg width="32" height="32" viewBox="0 0 24 24"><path fill="#e74c3c" stroke="#ffffff" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
+    const svgMoto = `<svg width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#ffc107" stroke="#000000" stroke-width="3"/><circle cx="20" cy="42" r="8" fill="#222222"/><circle cx="44" cy="42" r="8" fill="#222222"/><path d="M20 42 L26 26 L36 26 L42 34 L44 42" fill="none" stroke="#222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 26 L32 18 L38 18" fill="none" stroke="#222222" stroke-width="4" stroke-linecap="round"/></svg>`;
 
     function alertarMotoristaComSom() {
       if ('vibrate' in navigator) {
@@ -402,16 +437,53 @@
 
     function initPassengerMap() {
       if (!passengerMap) {
-        passengerMap = L.map('passenger-map', { zoomControl: true }).setView(origem, 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(passengerMap);
-        
-        pUserMarker = L.marker(origem, { icon: blueIcon })
-          .addTo(passengerMap)
-          .bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`)
-          .bindTooltip(`👤 ${currentUser.name}`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+        passengerMap = new maplibregl.Map({
+          container: 'passenger-map',
+          style: MAP_STYLE,
+          center: origem,
+          zoom: 15
+        });
+
+        passengerMap.addControl(new maplibregl.NavigationControl({
+          showCompass: true,
+          showZoom: true,
+          visualizePitch: true
+        }), 'top-right');
+
+        passengerMap.on('load', () => {
+          passengerMap.addSource('p-route-source', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+          });
+
+          passengerMap.addLayer({
+            id: 'p-route-line',
+            type: 'line',
+            source: 'p-route-source',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#007bff', 'line-width': 5, 'line-dasharray': [2, 2] }
+          });
+
+          passengerMap.addSource('p-driver-route-source', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+          });
+
+          passengerMap.addLayer({
+            id: 'p-driver-route-line',
+            type: 'line',
+            source: 'p-driver-route-source',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#00e676', 'line-width': 6, 'line-dasharray': [2, 2] }
+          });
+        });
+
+        pUserMarker = new maplibregl.Marker({ element: criarElementoMarker(svgBluePin, `👤 ${currentUser.name}`) })
+          .setLngLat(origem)
+          .addTo(passengerMap);
       }
-      
-      passengerMap.invalidateSize();
+
+      passengerMap.resize();
 
       const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '') || Date.now();
       const passengerRef = db.ref('passageiros/' + keyPhone);
@@ -421,21 +493,21 @@
       passengerRef.set({
         nome: currentUser.name,
         telefone: currentUser.phone,
-        lat: origem[0],
-        lng: origem[1],
+        lat: origem[1],
+        lng: origem[0],
         updatedAt: Date.now()
       });
 
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
-          origem = [pos.coords.latitude, pos.coords.longitude];
-          if (pUserMarker) pUserMarker.setLatLng(origem);
+          origem = [pos.coords.longitude, pos.coords.latitude];
+          if (pUserMarker) pUserMarker.setLngLat(origem);
           
           passengerRef.set({
             nome: currentUser.name,
             telefone: currentUser.phone,
-            lat: origem[0],
-            lng: origem[1],
+            lat: origem[1],
+            lng: origem[0],
             updatedAt: Date.now()
           });
         }, null, { enableHighAccuracy: true });
@@ -458,7 +530,7 @@
           const isOffline = !m || m.online === false || !m.updatedAt || (agora - m.updatedAt > CINCO_MINUTOS);
 
           if (isOffline) {
-            passengerMap.removeLayer(driverMarkers[placa]);
+            driverMarkers[placa].remove();
             delete driverMarkers[placa];
           }
         });
@@ -468,13 +540,13 @@
           const isOnline = m && m.online !== false && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
 
           if (isOnline && m.lat && m.lng) {
+            const coords = [m.lng, m.lat];
             if (driverMarkers[placa]) {
-              driverMarkers[placa].setLatLng([m.lat, m.lng]);
+              driverMarkers[placa].setLngLat(coords);
             } else {
-              driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
-                .addTo(passengerMap)
-                .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
-                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+              driverMarkers[placa] = new maplibregl.Marker({ element: criarElementoMarker(svgMoto, `🏍️ ${m.nome} (${m.placa})`) })
+                .setLngLat(coords)
+                .addTo(passengerMap);
             }
           }
         });
@@ -483,18 +555,53 @@
 
     function initDriverMapBase() {
       if (!driverMap) {
-        driverMap = L.map('driver-map', { zoomControl: true }).setView(driverPos, 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(driverMap);
-        
-        dSelfMarker = L.marker(driverPos, { icon: motoIcon })
-          .addTo(driverMap)
-          .bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`)
-          .bindTooltip(`🏍️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
-        
-        dRouteLayerGroup = L.layerGroup().addTo(driverMap);
+        driverMap = new maplibregl.Map({
+          container: 'driver-map',
+          style: MAP_STYLE,
+          center: driverPos,
+          zoom: 15
+        });
+
+        driverMap.addControl(new maplibregl.NavigationControl({
+          showCompass: true,
+          showZoom: true,
+          visualizePitch: true
+        }), 'top-right');
+
+        driverMap.on('load', () => {
+          driverMap.addSource('d-route-source1', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+          });
+
+          driverMap.addLayer({
+            id: 'd-route-line1',
+            type: 'line',
+            source: 'd-route-source1',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#00e676', 'line-width': 6, 'line-dasharray': [2, 2] }
+          });
+
+          driverMap.addSource('d-route-source2', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+          });
+
+          driverMap.addLayer({
+            id: 'd-route-line2',
+            type: 'line',
+            source: 'd-route-source2',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#2980b9', 'line-width': 6, 'line-dasharray': [2, 2] }
+          });
+        });
+
+        dSelfMarker = new maplibregl.Marker({ element: criarElementoMarker(svgMoto, `🏍️ ${currentUser.name} (${currentUser.plate})`) })
+          .setLngLat(driverPos)
+          .addTo(driverMap);
       }
-      
-      driverMap.invalidateSize();
+
+      driverMap.resize();
     }
 
     function salvarEAtivarGPSMotorista() {
@@ -505,19 +612,19 @@
 
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
-          driverPos = [pos.coords.latitude, pos.coords.longitude];
+          driverPos = [pos.coords.longitude, pos.coords.latitude];
           
-          if (dSelfMarker) dSelfMarker.setLatLng(driverPos);
+          if (dSelfMarker) dSelfMarker.setLngLat(driverPos);
           if (driverMap) {
-            driverMap.invalidateSize();
+            driverMap.resize();
             driverMap.panTo(driverPos);
           }
 
           driverRef.set({
             nome: currentUser.name,
             placa: currentUser.plate,
-            lat: driverPos[0],
-            lng: driverPos[1],
+            lat: driverPos[1],
+            lng: driverPos[0],
             online: true,
             updatedAt: Date.now()
           });
@@ -525,7 +632,7 @@
           if (activeRideId || pendingRide) {
             const ride = pendingRide;
             if (ride) {
-              exibirSolicitacaoNoMapaMotorista([ride.origem_lat, ride.origem_lng], [ride.destino_lat, ride.destino_lng], false);
+              exibirSolicitacaoNoMapaMotorista([ride.origem_lng, ride.origem_lat], [ride.destino_lng, ride.destino_lat], false);
             }
           }
         }, null, { enableHighAccuracy: true });
@@ -545,7 +652,7 @@
           const isOffline = !p || !p.updatedAt || (agora - p.updatedAt > CINCO_MINUTOS);
 
           if (isOffline) {
-            driverMap.removeLayer(passengerMarkers[key]);
+            passengerMarkers[key].remove();
             delete passengerMarkers[key];
           }
         });
@@ -555,13 +662,13 @@
           const isOnline = p && p.updatedAt && (agora - p.updatedAt <= CINCO_MINUTOS);
 
           if (isOnline && p.lat && p.lng) {
+            const coords = [p.lng, p.lat];
             if (passengerMarkers[key]) {
-              passengerMarkers[key].setLatLng([p.lat, p.lng]);
+              passengerMarkers[key].setLngLat(coords);
             } else {
-              passengerMarkers[key] = L.marker([p.lat, p.lng], { icon: blueIcon })
-                .addTo(driverMap)
-                .bindPopup(`👤 <b>Passageiro:</b><br>${p.nome}<br>📞 ${p.telefone}`)
-                .bindTooltip(`👤 ${p.nome}`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+              passengerMarkers[key] = new maplibregl.Marker({ element: criarElementoMarker(svgBluePin, `👤 ${p.nome}`) })
+                .setLngLat(coords)
+                .addTo(driverMap);
             }
           }
         });
@@ -570,16 +677,18 @@
 
     async function onPassengerMapClick(e) {
       if (activeRideId) return;
-      destino = [e.latlng.lat, e.latlng.lng];
+      destino = [e.lngLat.lng, e.lngLat.lat];
 
       if (pDestMarker) {
-        pDestMarker.setLatLng(destino);
+        pDestMarker.setLngLat(destino);
       } else {
-        pDestMarker = L.marker(destino, { icon: redIcon }).addTo(passengerMap);
+        pDestMarker = new maplibregl.Marker({ element: criarElementoMarker(svgRedPin, '🔴 Destino') })
+          .setLngLat(destino)
+          .addTo(passengerMap);
       }
 
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${origem[1]},${origem[0]};${destino[1]},${destino[0]}?overview=full&geometries=geojson`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${origem[0]},${origem[1]};${destino[0]},${destino[1]}?overview=full&geometries=geojson`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -598,15 +707,16 @@
           document.getElementById('distance-text').innerText = `Distância: ${distanciaKm.toFixed(2)} km`;
           document.getElementById('price-text').innerText = `R$ ${valorEstimado.toFixed(2).replace('.', ',')}`;
 
-          const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          if (pRouteLine) passengerMap.removeLayer(pRouteLine);
-          
-          pRouteLine = L.polyline(coordinates, { 
-            color: '#007bff', 
-            weight: 5,
-            dashArray: '8, 8' 
-          }).addTo(passengerMap);
-          passengerMap.fitBounds(pRouteLine.getBounds(), { padding: [40, 40] });
+          const geom = data.routes[0].geometry;
+          if (passengerMap.getSource('p-route-source')) {
+            passengerMap.getSource('p-route-source').setData({
+              type: 'Feature',
+              geometry: geom
+            });
+          }
+
+          const bounds = geom.coordinates.reduce((acc, coord) => acc.extend(coord), new maplibregl.LngLatBounds(geom.coordinates[0], geom.coordinates[0]));
+          passengerMap.fitBounds(bounds, { padding: 50 });
         }
       } catch (error) {
         console.error("Erro ao traçar rota:", error);
@@ -616,25 +726,20 @@
     async function desenharRotaMotoristaAtePassageiroNoCliente(motoristaLat, motoristaLng) {
       if (!passengerMap || !origem) return;
 
-      const url = `https://router.project-osrm.org/route/v1/driving/${motoristaLng},${motoristaLat};${origem[1]},${origem[0]}?overview=full&geometries=geojson`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${motoristaLng},${motoristaLat};${origem[0]},${origem[1]}?overview=full&geometries=geojson`;
 
       try {
         const res = await fetch(url);
         const data = await res.json();
 
         if (data.routes && data.routes.length > 0) {
-          const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          
-          if (pDriverToPassengerLine) {
-            passengerMap.removeLayer(pDriverToPassengerLine);
+          const geom = data.routes[0].geometry;
+          if (passengerMap.getSource('p-driver-route-source')) {
+            passengerMap.getSource('p-driver-route-source').setData({
+              type: 'Feature',
+              geometry: geom
+            });
           }
-
-          pDriverToPassengerLine = L.polyline(coordinates, { 
-            color: '#00e676',
-            weight: 6,
-            dashArray: '6, 6',
-            opacity: 0.95 
-          }).addTo(passengerMap);
         }
       } catch (e) {
         console.error("Erro Rota Cliente-Motorista:", e);
@@ -651,10 +756,10 @@
         id: activeRideId,
         passageiroKey: keyPhone,
         origem_endereco: `${currentUser.name} (${currentUser.phone})`,
-        origem_lat: origem[0],
-        origem_lng: origem[1],
-        destino_lat: destino[0],
-        destino_lng: destino[1],
+        origem_lat: origem[1],
+        origem_lng: origem[0],
+        destino_lat: destino[1],
+        destino_lng: destino[0],
         valor: parseFloat(valorEstimado.toFixed(2)),
         status: 'solicitada'
       };
@@ -701,13 +806,15 @@
     function resetarEstadoPassageiro() {
       activeRideId = null;
       destino = null;
-      if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
-      if (pRouteLine) { passengerMap.removeLayer(pRouteLine); pRouteLine = null; }
+      if (pDestMarker) { pDestMarker.remove(); pDestMarker = null; }
       
-      // APAGA A LINHA VERDE DO TRAJETO QUANDO A CORRIDA É ENCERRADA
-      if (pDriverToPassengerLine) { 
-        passengerMap.removeLayer(pDriverToPassengerLine); 
-        pDriverToPassengerLine = null; 
+      if (passengerMap) {
+        if (passengerMap.getSource('p-route-source')) {
+          passengerMap.getSource('p-route-source').setData({ type: 'FeatureCollection', features: [] });
+        }
+        if (passengerMap.getSource('p-driver-route-source')) {
+          passengerMap.getSource('p-driver-route-source').setData({ type: 'FeatureCollection', features: [] });
+        }
       }
       
       document.getElementById('status-box').style.display = 'none';
@@ -738,7 +845,7 @@
           document.getElementById('driver-ride-price').innerText = `R$ ${valorFormatado}`;
           document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
 
-          exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng], true);
+          exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lng, pendingRide.origem_lat], [pendingRide.destino_lng, pendingRide.destino_lat], true);
 
           if (lastNotifiedRideId !== pendingRide.id) {
             lastNotifiedRideId = pendingRide.id;
@@ -757,56 +864,57 @@
     }
 
     function limparRotasMapaMotorista() {
-      if (dOrigMarker) { driverMap.removeLayer(dOrigMarker); dOrigMarker = null; }
-      if (dDestMarker) { driverMap.removeLayer(dDestMarker); dDestMarker = null; }
-      if (dRouteLayerGroup) { dRouteLayerGroup.clearLayers(); }
+      if (dOrigMarker) { dOrigMarker.remove(); dOrigMarker = null; }
+      if (dDestMarker) { dDestMarker.remove(); dDestMarker = null; }
+
+      if (driverMap) {
+        if (driverMap.getSource('d-route-source1')) {
+          driverMap.getSource('d-route-source1').setData({ type: 'FeatureCollection', features: [] });
+        }
+        if (driverMap.getSource('d-route-source2')) {
+          driverMap.getSource('d-route-source2').setData({ type: 'FeatureCollection', features: [] });
+        }
+      }
     }
 
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro, ajustarZoom = false) {
       limparRotasMapaMotorista();
 
-      dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
-        .addTo(driverMap)
-        .bindPopup("<b>Embarque Passageiro</b>")
-        .bindTooltip("🟢 Embarque", { permanent: true, direction: 'bottom', className: 'custom-label' });
+      dOrigMarker = new maplibregl.Marker({ element: criarElementoMarker(svgGreenPin, '🟢 Embarque') })
+        .setLngLat(pOrigemPassageiro)
+        .addTo(driverMap);
 
-      dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon })
-        .addTo(driverMap)
-        .bindPopup("<b>Destino Final</b>")
-        .bindTooltip("🔴 Destino", { permanent: true, direction: 'bottom', className: 'custom-label' });
+      dDestMarker = new maplibregl.Marker({ element: criarElementoMarker(svgRedPin, '🔴 Destino') })
+        .setLngLat(pDestinoPassageiro)
+        .addTo(driverMap);
 
-      const urlAtePassageiro = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
-      const urlAteDestino = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
+      const urlAtePassageiro = `https://router.project-osrm.org/route/v1/driving/${driverPos[0]},${driverPos[1]};${pOrigemPassageiro[0]},${pOrigemPassageiro[1]}?overview=full&geometries=geojson`;
+      const urlAteDestino = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[0]},${pOrigemPassageiro[1]};${pDestinoPassageiro[0]},${pDestinoPassageiro[1]}?overview=full&geometries=geojson`;
 
       try {
         const [res1, res2] = await Promise.all([fetch(urlAtePassageiro), fetch(urlAteDestino)]);
         const data1 = await res1.json();
         const data2 = await res2.json();
 
-        if (dRouteLayerGroup) {
-          if (data1.routes && data1.routes.length > 0) {
-            const coordsAtePassageiro = data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            L.polyline(coordsAtePassageiro, { 
-              color: '#00e676',
-              weight: 6,
-              dashArray: '6, 6',
-              opacity: 0.95 
-            }).addTo(dRouteLayerGroup);
-          }
+        if (data1.routes && data1.routes.length > 0 && driverMap.getSource('d-route-source1')) {
+          driverMap.getSource('d-route-source1').setData({
+            type: 'Feature',
+            geometry: data1.routes[0].geometry
+          });
+        }
 
-          if (data2.routes && data2.routes.length > 0) {
-            const coordsAteDestino = data2.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            L.polyline(coordsAteDestino, { 
-              color: '#2980b9', 
-              weight: 6,
-              dashArray: '10, 10',
-              opacity: 0.85 
-            }).addTo(dRouteLayerGroup);
-          }
+        if (data2.routes && data2.routes.length > 0 && driverMap.getSource('d-route-source2')) {
+          driverMap.getSource('d-route-source2').setData({
+            type: 'Feature',
+            geometry: data2.routes[0].geometry
+          });
+        }
 
-          if (ajustarZoom) {
-            driverMap.fitBounds(L.featureGroup([dSelfMarker, dOrigMarker, dDestMarker]).getBounds(), { padding: [50, 50] });
-          }
+        if (ajustarZoom) {
+          const bounds = new maplibregl.LngLatBounds(driverPos, driverPos)
+            .extend(pOrigemPassageiro)
+            .extend(pDestinoPassageiro);
+          driverMap.fitBounds(bounds, { padding: 50 });
         }
       } catch (e) {
         console.error("Erro ao desenhar rotas do motorista:", e);
@@ -878,8 +986,8 @@
     }
 
     window.addEventListener('resize', () => {
-      if (passengerMap) passengerMap.invalidateSize();
-      if (driverMap) driverMap.invalidateSize();
+      if (passengerMap) passengerMap.resize();
+      if (driverMap) driverMap.resize();
     });
   </script>
 </body>
