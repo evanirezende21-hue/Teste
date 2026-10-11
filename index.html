@@ -261,6 +261,7 @@
 
     let driverMarkers = {}; 
     let passengerMarkers = {};
+    let otherDriverMarkers = {}; // Para gerenciar outros motoristas no mapa do motorista
 
     let origem = [-21.5431, -43.0108]; 
     let driverPos = [-21.5431, -43.0108]; 
@@ -414,6 +415,7 @@
           initDriverMapBase();
           salvarEAtivarGPSMotorista();
           carregarEExibirPassageirosNoMapaMotorista();
+          carregarEExibirOutrosMotoristasNoMapaMotorista(); // NOVO: Exibe outros motoristas para o motorista
           escutarCorridasMotorista();
         }, 150);
       }
@@ -592,7 +594,7 @@
             updatedAt: Date.now()
           });
 
-          if (activeRideId || pendingRide) {
+          if ((activeRideId || pendingRide) && currentRideStatus) {
             const ride = pendingRide;
             if (ride) {
               exibirSolicitacaoNoMapaMotorista([ride.origem_lat, ride.origem_lng], [ride.destino_lat, ride.destino_lng], false);
@@ -632,6 +634,46 @@
                 .addTo(driverMap)
                 .bindPopup(`👤 <b>Passageiro:</b><br>${p.nome}<br>📞 ${p.telefone}`)
                 .bindTooltip(`👤 ${p.nome}`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+            }
+          }
+        });
+      });
+    }
+
+    // NOVO: Função para exibir os OUTROS motoristas no mapa do motorista atual
+    function carregarEExibirOutrosMotoristasNoMapaMotorista() {
+      db.ref('motoristas').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        if (!driverMap) return;
+
+        const minhaPlacaKey = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+        const agora = Date.now();
+        const CINCO_MINUTOS = 5 * 60 * 1000;
+
+        Object.keys(otherDriverMarkers).forEach(placa => {
+          const m = data[placa];
+          const isOffline = !m || m.online === false || !m.updatedAt || (agora - m.updatedAt > CINCO_MINUTOS);
+
+          if (isOffline || placa === minhaPlacaKey) {
+            driverMap.removeLayer(otherDriverMarkers[placa]);
+            delete otherDriverMarkers[placa];
+          }
+        });
+
+        Object.keys(data).forEach(placa => {
+          if (placa === minhaPlacaKey) return; // Ignora a si mesmo para não duplicar com o marcador principal
+
+          const m = data[placa];
+          const isOnline = m && m.online !== false && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
+
+          if (isOnline && m.lat && m.lng) {
+            if (otherDriverMarkers[placa]) {
+              otherDriverMarkers[placa].setLatLng([m.lat, m.lng]);
+            } else {
+              otherDriverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
+                .addTo(driverMap)
+                .bindPopup(`🏍️ <b>Colega:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
+                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
             }
           }
         });
@@ -820,18 +862,17 @@
     function escutarCorridasMotorista() {
       db.ref('corridas').on('value', (snapshot) => {
         const data = snapshot.val();
-        if (activeRideId) return;
-
+        
         let corridaEncontrada = null;
         if (data) {
           Object.keys(data).forEach(key => {
-            if (data[key].status === 'solicitada') {
+            if (data[key].status === 'solicitada' && !activeRideId) {
               corridaEncontrada = data[key];
             }
           });
         }
 
-        if (corridaEncontrada) {
+        if (corridaEncontrada && !activeRideId) {
           pendingRide = corridaEncontrada;
           currentRideStatus = 'solicitada';
           const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
@@ -851,7 +892,7 @@
             alertarMotoristaComSom();
           }
 
-        } else if (!activeRideId) {
+        } else if (!activeRideId && !corridaEncontrada) {
           pendingRide = null;
           currentRideStatus = null;
           lastNotifiedRideId = null;
@@ -916,7 +957,7 @@
             }).addTo(dRouteLayerGroup);
           }
 
-        } else {
+        } else if (currentRideStatus === 'solicitada') {
           dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
             .addTo(driverMap)
             .bindPopup("<b>Embarque Passageiro</b>")
@@ -1013,10 +1054,12 @@
       const rideRef = db.ref('corridas/' + activeRideId);
       rideRef.remove();
 
-      limparRotasMapaMotorista();
       activeRideId = null;
       pendingRide = null;
       currentRideStatus = null;
+      lastNotifiedRideId = null;
+
+      limparRotasMapaMotorista();
 
       document.getElementById('driver-pickup-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'none';
