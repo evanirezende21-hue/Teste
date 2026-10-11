@@ -236,7 +236,7 @@
     let lastNotifiedRideId = null;
 
     let passengerMap, driverMap;
-    let pUserMarker, pDestMarker, pRouteLine;
+    let pUserMarker, pDestMarker, pRouteLine, pDriverToPassengerLine;
     let dSelfMarker, dOrigMarker, dDestMarker;
     let dRouteLayerGroup = null;
 
@@ -285,7 +285,6 @@
       }
     }
 
-    // FUNÇÃO QUE MANTÉM A TELA ACESA (WAKELOCK)
     async function manterTelaAcesa() {
       try {
         if ('wakeLock' in navigator) {
@@ -296,7 +295,6 @@
       }
     }
 
-    // REATIVA O WAKELOCK CASO O MOTORISTA MINIMIZE OU RETORNE AO NAVEGADOR
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && currentRole === 'motorista') {
         manterTelaAcesa();
@@ -524,8 +522,11 @@
             updatedAt: Date.now()
           });
 
-          if (pendingRide) {
-            exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng], false);
+          if (activeRideId || pendingRide) {
+            const ride = pendingRide;
+            if (ride) {
+              exibirSolicitacaoNoMapaMotorista([ride.origem_lat, ride.origem_lng], [ride.destino_lat, ride.destino_lng], false);
+            }
           }
         }, null, { enableHighAccuracy: true });
       }
@@ -612,6 +613,35 @@
       }
     }
 
+    // DESENHA A ROTA DINÂMICA VERDE LIMA QUE SUME CONFORME O MOTORISTA AVANÇA
+    async function desenharRotaMotoristaAtePassageiroNoCliente(motoristaLat, motoristaLng) {
+      if (!passengerMap || !origem) return;
+
+      const url = `https://router.project-osrm.org/route/v1/driving/${motoristaLng},${motoristaLat};${origem[1]},${origem[0]}?overview=full&geometries=geojson`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.routes && data.routes.length > 0) {
+          const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          
+          if (pDriverToPassengerLine) {
+            passengerMap.removeLayer(pDriverToPassengerLine);
+          }
+
+          pDriverToPassengerLine = L.polyline(coordinates, { 
+            color: '#00e676', // VERDE LIMA
+            weight: 6,
+            dashArray: '6, 6',
+            opacity: 0.95 
+          }).addTo(passengerMap);
+        }
+      } catch (e) {
+        console.error("Erro Rota Cliente-Motorista:", e);
+      }
+    }
+
     function solicitarCorrida() {
       const newRideRef = db.ref('corridas').push();
       activeRideId = newRideRef.key;
@@ -650,6 +680,17 @@
 
           box.innerText = `✅ ${nomeMotorista}${placaMotorista} aceitou a corrida e está a caminho! (Valor: R$ ${valorFormatado})`;
           box.style.color = '#27ae60';
+
+          if (corrida.motoristaPlaca) {
+            const keyPlate = corrida.motoristaPlaca.replace(/[^a-zA-Z0-9]/g, '');
+            db.ref('motoristas/' + keyPlate).on('value', (mSnap) => {
+              const mData = mSnap.val();
+              if (mData && mData.lat && mData.lng) {
+                desenharRotaMotoristaAtePassageiroNoCliente(mData.lat, mData.lng);
+              }
+            });
+          }
+
         } else if (corrida.status === 'concluida') {
           alert(`🎉 Sua corrida foi concluída com sucesso!\n\n💰 Valor final: R$ ${valorFormatado}`);
           db.ref('corridas/' + activeRideId).off();
@@ -663,6 +704,7 @@
       destino = null;
       if (pDestMarker) { passengerMap.removeLayer(pDestMarker); pDestMarker = null; }
       if (pRouteLine) { passengerMap.removeLayer(pRouteLine); pRouteLine = null; }
+      if (pDriverToPassengerLine) { passengerMap.removeLayer(pDriverToPassengerLine); pDriverToPassengerLine = null; }
       
       document.getElementById('status-box').style.display = 'none';
       document.getElementById('instruction-text').style.display = 'block';
@@ -716,6 +758,7 @@
       if (dRouteLayerGroup) { dRouteLayerGroup.clearLayers(); }
     }
 
+    // TRAÇO DINÂMICO QUE RECALCULA E SUME À MEDIDA QUE O MOTORISTA AVANÇA
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro, ajustarZoom = false) {
       limparRotasMapaMotorista();
 
@@ -737,38 +780,42 @@
         const data1 = await res1.json();
         const data2 = await res2.json();
 
-        let coordsTotais = [];
+        if (dRouteLayerGroup) {
+          // LINHA 1 (VERDE LIMA DINÂMICA): RECALCULADA DA POSIÇÃO DA MOTO ATÉ O PASSAGEIRO
+          if (data1.routes && data1.routes.length > 0) {
+            const coordsAtePassageiro = data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            L.polyline(coordsAtePassageiro, { 
+              color: '#00e676', // VERDE LIMA
+              weight: 6,
+              dashArray: '6, 6',
+              opacity: 0.95 
+            }).addTo(dRouteLayerGroup);
+          }
 
-        if (data1.routes && data1.routes.length > 0) {
-          coordsTotais = coordsTotais.concat(data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
-        }
-        if (data2.routes && data2.routes.length > 0) {
-          coordsTotais = coordsTotais.concat(data2.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
-        }
-
-        if (coordsTotais.length > 0 && dRouteLayerGroup) {
-          L.polyline(coordsTotais, { 
-            color: '#2980b9', 
-            weight: 6,
-            dashArray: '10, 10',
-            opacity: 0.9 
-          }).addTo(dRouteLayerGroup);
+          // LINHA 2 (AZUL): PASSAGEIRO ATÉ O DESTINO
+          if (data2.routes && data2.routes.length > 0) {
+            const coordsAteDestino = data2.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            L.polyline(coordsAteDestino, { 
+              color: '#2980b9', 
+              weight: 6,
+              dashArray: '10, 10',
+              opacity: 0.85 
+            }).addTo(dRouteLayerGroup);
+          }
 
           if (ajustarZoom) {
             driverMap.fitBounds(L.featureGroup([dSelfMarker, dOrigMarker, dDestMarker]).getBounds(), { padding: [50, 50] });
           }
         }
       } catch (e) {
-        console.error("Erro ao desenhar rotas:", e);
+        console.error("Erro ao desenhar rotas do motorista:", e);
       }
     }
 
-    // CONFIRMA O ACEITE DA CORRIDA E FORÇA A TELA A FICAR ACESA
     function confirmarAceiteCorrida() {
       if (!pendingRide) return;
       activeRideId = pendingRide.id;
 
-      // REATIVA A TELA ACESA NO TOQUE DO MOTORISTA
       manterTelaAcesa();
 
       db.ref('corridas/' + activeRideId).update({ 
