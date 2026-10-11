@@ -1,4 +1,3 @@
-HTML
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -235,7 +234,7 @@ HTML
     let pendingRide = null;
     let wakeLock = null;
     let lastNotifiedRideId = null;
-    let activeDriverTrackingRef = null; // REFERÊNCIA PARA CANCELAR O RASTREIO DO MOTORISTA NO CLIENTE
+    let activeDriverTrackingRef = null;
 
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine, pDriverToPassengerLine;
@@ -406,9 +405,10 @@ HTML
       if (!passengerMap) {
         passengerMap = L.map('passenger-map', { zoomControl: true }).setView(origem, 16);
         
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { 
-          maxZoom: 20,
-          attribution: '&copy; OpenStreetMap' 
+        // MAPA ESTILO GOOGLE STREETS / ESRI COM Nomes de Ruas Limpos e Alta Precisão
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19,
+          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom'
         }).addTo(passengerMap);
         
         pUserMarker = L.marker(origem, { icon: blueIcon })
@@ -491,9 +491,10 @@ HTML
       if (!driverMap) {
         driverMap = L.map('driver-map', { zoomControl: true }).setView(driverPos, 16);
         
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { 
-          maxZoom: 20,
-          attribution: '&copy; OpenStreetMap' 
+        // MAPA ESTILO GOOGLE STREETS / ESRI COM Nomes de Ruas Limpos e Alta Precisão
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19,
+          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom'
         }).addTo(driverMap);
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
@@ -715,19 +716,16 @@ HTML
     }
 
     function resetarEstadoPassageiro() {
-      // 1. DESCONECTA O OUVINTE DE POSIÇÃO DO MOTORISTA NO FIREBASE
       if (activeDriverTrackingRef) {
         activeDriverTrackingRef.off();
         activeDriverTrackingRef = null;
       }
 
-      // 2. APAGA A LINHA VERDE DO TRAJETO E REMOVE DO MAPA
       if (pDriverToPassengerLine) { 
         passengerMap.removeLayer(pDriverToPassengerLine); 
         pDriverToPassengerLine = null; 
       }
 
-      // 3. REMOVE MARCADORES DE DESTINO E LINHAS DE ROTA DA CORRIDA
       if (pDestMarker) { 
         passengerMap.removeLayer(pDestMarker); 
         pDestMarker = null; 
@@ -740,7 +738,6 @@ HTML
       activeRideId = null;
       destino = null;
 
-      // 4. LIMPA A MENSAGEM DA TELA DO CLIENTE E RESTAURA O INSTRUCTS INICIAL
       const statusBox = document.getElementById('status-box');
       statusBox.style.display = 'none';
       statusBox.innerText = '';
