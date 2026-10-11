@@ -7,7 +7,7 @@
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Leaflet Rotate CSS (Ativa suporte a rotação) -->
+  <!-- Leaflet Rotate CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.css" />
 
   <style>
@@ -207,8 +207,13 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Leaflet Rotate JS (Habilita rotação por toque de dois dedos e comando de rotação) -->
+  <!-- Leaflet Rotate JS -->
   <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
+
+  <!-- Google Maps API (Com a chave fornecida) -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCCQ7AkXO2GKKYFvGWNQC0mBVWSfG8Z_r8"></script>
+  <!-- Leaflet Google Mutant (Integra o mapa nativo do Google Maps dentro do Leaflet) -->
+  <script src="https://unpkg.com/leaflet.gridlayer.googlemutant@latest/Leaflet.GoogleMutant.js"></script>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -407,7 +412,6 @@
 
     function initPassengerMap() {
       if (!passengerMap) {
-        // Habilita a rotação de mapa no Leaflet Rotate
         passengerMap = L.map('passenger-map', { 
           zoomControl: true,
           rotate: true,
@@ -415,9 +419,10 @@
           rotateControl: false
         }).setView(origem, 16);
         
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 19,
-          attribution: 'Tiles &copy; Esri'
+        // Camada oficial do Google Maps Mutant
+        L.gridLayer.googleMutant({
+          type: 'roadmap',
+          maxZoom: 19
         }).addTo(passengerMap);
         
         pUserMarker = L.marker(origem, { icon: blueIcon })
@@ -498,7 +503,6 @@
 
     function initDriverMapBase() {
       if (!driverMap) {
-        // Habilita a rotação de mapa no Leaflet Rotate
         driverMap = L.map('driver-map', { 
           zoomControl: true,
           rotate: true,
@@ -506,9 +510,10 @@
           rotateControl: false
         }).setView(driverPos, 16);
         
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 19,
-          attribution: 'Tiles &copy; Esri'
+        // Camada oficial do Google Maps Mutant
+        L.gridLayer.googleMutant({
+          type: 'roadmap',
+          maxZoom: 19
         }).addTo(driverMap);
         
         dSelfMarker = L.marker(driverPos, { icon: motoIcon })
@@ -537,7 +542,6 @@
             driverMap.invalidateSize();
             driverMap.panTo(driverPos);
 
-            // GIRA O MAPA ACOMPANHANDO A DIREÇÃO DO MOVIMENTO DA MOTO (HEADING)
             if (pos.coords.heading !== null && pos.coords.heading !== undefined && !isNaN(pos.coords.heading)) {
               driverMap.setBearing(-pos.coords.heading);
             }
