@@ -428,7 +428,6 @@
           rotateControl: false
         }).setView(origem, 16);
         
-        // Camadas Estilo Google Maps (Padrão de Ruas e Satélite)
         const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
           maxZoom: 20,
           subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -533,7 +532,6 @@
           rotateControl: false
         }).setView(driverPos, 16);
         
-        // Camadas Estilo Google Maps para o Motorista
         const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
           maxZoom: 20,
           subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -702,7 +700,7 @@
           }
 
           pDriverToPassengerLine = L.polyline(coordinates, { 
-            color: '#00e676', // VERDE LIMA
+            color: '#00e676', 
             weight: 6,
             dashArray: '6, 6',
             opacity: 0.95 
@@ -875,21 +873,17 @@
     async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro, ajustarZoom = false) {
       limparRotasMapaMotorista();
 
-      dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
-        .addTo(driverMap)
-        .bindPopup("<b>Embarque Passageiro</b>")
-        .bindTooltip("🟢 Embarque", { permanent: true, direction: 'bottom', className: 'custom-label' });
-
-      dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon })
-        .addTo(driverMap)
-        .bindPopup("<b>Destino Final</b>")
-        .bindTooltip("🔴 Destino", { permanent: true, direction: 'bottom', className: 'custom-label' });
-
       const urlAtePassageiro = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
       const urlAteDestino = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
 
       try {
         if (currentRideStatus === 'aceita') {
+          // Apenas marcador verde de embarque enquanto vai buscar o passageiro
+          dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
+            .addTo(driverMap)
+            .bindPopup("<b>Embarque Passageiro</b>")
+            .bindTooltip("🟢 Embarque", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
           const res1 = await fetch(urlAtePassageiro);
           const data1 = await res1.json();
 
@@ -904,6 +898,12 @@
           }
 
         } else if (currentRideStatus === 'em_andamento') {
+          // PASSAGEIRO EMBARCOU: ADICIONA APENAS O DESTINO FINAL (O MARCADOR VERDE É REMOVIDO)
+          dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon })
+            .addTo(driverMap)
+            .bindPopup("<b>Destino Final</b>")
+            .bindTooltip("🔴 Destino", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
           const urlMotoAteDestino = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
           const res3 = await fetch(urlMotoAteDestino);
           const data3 = await res3.json();
@@ -919,6 +919,17 @@
           }
 
         } else {
+          // SOLICITAÇÃO INICIAL (EXIBE AMBOS OS MARCADORES)
+          dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
+            .addTo(driverMap)
+            .bindPopup("<b>Embarque Passageiro</b>")
+            .bindTooltip("🟢 Embarque", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
+          dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon })
+            .addTo(driverMap)
+            .bindPopup("<b>Destino Final</b>")
+            .bindTooltip("🔴 Destino", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
           const [res1, res2] = await Promise.all([fetch(urlAtePassageiro), fetch(urlAteDestino)]);
           const data1 = await res1.json();
           const data2 = await res2.json();
@@ -947,7 +958,10 @@
         }
 
         if (ajustarZoom) {
-          driverMap.fitBounds(L.featureGroup([dSelfMarker, dOrigMarker, dDestMarker]).getBounds(), { padding: [50, 50] });
+          const groupMarkers = [dSelfMarker];
+          if (dOrigMarker) groupMarkers.push(dOrigMarker);
+          if (dDestMarker) groupMarkers.push(dDestMarker);
+          driverMap.fitBounds(L.featureGroup(groupMarkers).getBounds(), { padding: [50, 50] });
         }
       } catch (e) {
         console.error("Erro ao desenhar rotas do motorista:", e);
