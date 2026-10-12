@@ -138,7 +138,7 @@
           <input type="text" id="user-plate" placeholder="Ex: ABC-1234" />
         </div>
 
-        <button class="btn-primary" id="btn-login" onclick="entrarNoApp()">ENTRAR NO APP</button>
+        <button class="btn-primary" id="btn-login" onclick="entrarNoAppManual()">ENTRAR NO APP</button>
       </div>
     </div>
   </div>
@@ -261,7 +261,7 @@
 
     let driverMarkers = {}; 
     let passengerMarkers = {};
-    let otherDriverMarkers = {}; // Para gerenciar outros motoristas no mapa do motorista
+    let otherDriverMarkers = {};
 
     let origem = [-21.5431, -43.0108]; 
     let driverPos = [-21.5431, -43.0108]; 
@@ -330,20 +330,22 @@
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
     }
 
+    // Monitora o estado de autenticação do Firebase
     auth.onAuthStateChanged((user) => {
       if (user) {
         const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
+        const savedName = localStorage.getItem('sjn_name') || user.displayName || 'Usuário';
+        const savedPhone = localStorage.getItem('sjn_phone') || user.phoneNumber || user.email || 'Google User';
         const savedPlate = localStorage.getItem('sjn_plate') || 'ABC-1234';
         
         currentRole = savedRole;
-        let phone = user.phoneNumber || user.email || 'Google User';
-
-        entrarNoAppComDados(user.displayName, phone, savedPlate);
+        entrarNoAppComDados(savedName, savedPhone, savedPlate);
       }
     });
 
     async function entrarComGoogle() {
       const plateInput = document.getElementById('user-plate').value.trim();
+      const nameInput = document.getElementById('user-name').value.trim();
       
       if (currentRole === 'motorista' && !plateInput && !localStorage.getItem('sjn_plate')) {
         alert('Motorista: Por favor, digite a Placa da sua moto antes de entrar com o Google.');
@@ -351,34 +353,24 @@
       }
 
       if (plateInput) localStorage.setItem('sjn_plate', plateInput);
+      if (nameInput) localStorage.setItem('sjn_name', nameInput);
       localStorage.setItem('sjn_role', currentRole);
 
       const provider = new firebase.auth.GoogleAuthProvider();
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-      if (isIOS) {
+      try {
+        await auth.signInWithPopup(provider);
+      } catch (error) {
         try {
-          const result = await auth.signInWithPopup(provider);
-          const user = result.user;
-          let phone = user.phoneNumber || user.email || 'Google User';
-          entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
-        } catch (error) {
-          console.log("Tentando Redirect iOS:", error);
-          auth.signInWithRedirect(provider);
-        }
-      } else {
-        try {
-          const result = await auth.signInWithPopup(provider);
-          const user = result.user;
-          let phone = user.phoneNumber || user.email || 'Google User';
-          entrarNoAppComDados(user.displayName, phone, plateInput || localStorage.getItem('sjn_plate') || 'ABC-1234');
-        } catch (error) {
-          auth.signInWithRedirect(provider);
+          await auth.signInWithRedirect(provider);
+        } catch (err) {
+          console.error("Erro no login Google:", err);
+          alert("Erro ao autenticar com o Google. Tente novamente.");
         }
       }
     }
 
-    function entrarNoApp() {
+    // Login anônimo/manual caso queira usar sem popup do Google
+    async function entrarNoAppManual() {
       const name = document.getElementById('user-name').value.trim();
       const phone = document.getElementById('user-phone').value.trim();
       const plate = document.getElementById('user-plate').value.trim();
@@ -388,7 +380,19 @@
         return;
       }
 
-      entrarNoAppComDados(name, phone, plate);
+      localStorage.setItem('sjn_name', name);
+      localStorage.setItem('sjn_phone', phone);
+      localStorage.setItem('sjn_plate', plate);
+      localStorage.setItem('sjn_role', currentRole);
+
+      try {
+        // Realiza um login anônimo no Firebase para satisfazer a regra auth != null
+        await auth.signInAnonymously();
+        entrarNoAppComDados(name, phone, plate);
+      } catch (error) {
+        console.error("Erro no login anônimo:", error);
+        alert("Erro de autenticação no Firebase. Verifique suas regras.");
+      }
     }
 
     function entrarNoAppComDados(name, phone, plate) {
@@ -415,7 +419,7 @@
           initDriverMapBase();
           salvarEAtivarGPSMotorista();
           carregarEExibirPassageirosNoMapaMotorista();
-          carregarEExibirOutrosMotoristasNoMapaMotorista(); // NOVO: Exibe outros motoristas para o motorista
+          carregarEExibirOutrosMotoristasNoMapaMotorista();
           escutarCorridasMotorista();
         }, 150);
       }
@@ -640,7 +644,6 @@
       });
     }
 
-    // NOVO: Função para exibir os OUTROS motoristas no mapa do motorista atual
     function carregarEExibirOutrosMotoristasNoMapaMotorista() {
       db.ref('motoristas').on('value', (snapshot) => {
         const data = snapshot.val() || {};
@@ -661,7 +664,7 @@
         });
 
         Object.keys(data).forEach(placa => {
-          if (placa === minhaPlacaKey) return; // Ignora a si mesmo para não duplicar com o marcador principal
+          if (placa === minhaPlacaKey) return;
 
           const m = data[placa];
           const isOnline = m && m.online !== false && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
