@@ -290,7 +290,7 @@
 
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
-    const ADMIN_PASSWORD_CORRETA = "Rinaverinave32@"; // Senha de administrador atualizada
+    const ADMIN_PASSWORD_CORRETA = "Rinaverinave32@";
 
     let currentRole = 'passageiro';
     let currentUser = null;
@@ -887,13 +887,15 @@
     }
 
     async function desenharRotaMotoristaAtePassageiroNoCliente(motoristaLat, motoristaLng) {
-      if (!passengerMap || !origem) return;
+      if (!passengerMap || !origem || !activeRideId) return;
 
       const url = `https://router.project-osrm.org/route/v1/driving/${motoristaLng},${motoristaLat};${origem[1]},${origem[0]}?overview=full&geometries=geojson`;
 
       try {
         const res = await fetch(url);
         const data = await res.json();
+
+        if (!activeRideId) return;
 
         if (data.routes && data.routes.length > 0) {
           const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
