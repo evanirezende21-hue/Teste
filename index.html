@@ -187,6 +187,12 @@
       🔎 Aguardando solicitações de corrida...
     </div>
 
+    <!-- CARD BLOQUEADO -->
+    <div class="bottom-card" id="driver-blocked-card" style="display: none; text-align: center; background: #ffebee; border: 1px solid #c62828;">
+      <div style="color: #c62828; font-weight: bold; font-size: 16px; margin-bottom: 6px;">🚫 Acesso Suspenso</div>
+      <div class="info-text" id="driver-blocked-text" style="color: #b71c1c;">Sua conta possui pendência financeira. Realize o Pix de taxa para regularizar.</div>
+    </div>
+
     <!-- CARD SOLICITAÇÃO -->
     <div class="bottom-card" id="driver-request-card" style="display: none;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -214,7 +220,7 @@
         <span class="price-tag" id="driver-active-ride-price" style="font-size: 20px;">R$ 0,00</span>
       </div>
       <div class="info-text" id="driver-active-passenger-info"><b>Passageiro:</b> --</div>
-      <button class="btn-primary" id="btn-finish-ride" onclick="finalizarCorrida()">CONCLUIR CORRIDA</button>
+      <button class="btn-primary" id="btn-finish-ride" onclick="finalizarCorrida()">CONCLUIR CORRIDA (R$ 1,00 Taxa)</button>
     </div>
   </div>
 
@@ -253,6 +259,8 @@
     let wakeLock = null;
     let lastNotifiedRideId = null;
     let activeDriverTrackingRef = null;
+    let driverStatusRef = null;
+    let isDriverBlocked = false;
 
     let passengerMap, driverMap;
     let pUserMarker, pDestMarker, pRouteLine, pDriverToPassengerLine;
@@ -286,6 +294,7 @@
     });
 
     function alertarMotoristaComSom() {
+      if (isDriverBlocked) return;
       if ('vibrate' in navigator) {
         navigator.vibrate([300, 150, 300, 150, 300]);
       }
@@ -415,6 +424,7 @@
         setTimeout(() => {
           initDriverMapBase();
           salvarEAtivarGPSMotorista();
+          escutarStatusMotorista();
           carregarEExibirPassageirosNoMapaMotorista();
           carregarEExibirOutrosMotoristasNoMapaMotorista();
           escutarCorridasMotorista();
@@ -443,7 +453,6 @@
           attribution: '&copy; Google Satellite'
         });
 
-        // DEFINIDO COMO PADRÃO: Satélite inicia ativo
         googleSat.addTo(passengerMap);
 
         L.control.layers({
@@ -501,7 +510,7 @@
 
         Object.keys(driverMarkers).forEach(placa => {
           const m = data[placa];
-          const isOffline = !m || m.online === false || !m.updatedAt || (agora - m.updatedAt > CINCO_MINUTOS);
+          const isOffline = !m || m.online === false || m.bloqueado === true || !m.updatedAt || (agora - m.updatedAt > CINCO_MINUTOS);
 
           if (isOffline) {
             passengerMap.removeLayer(driverMarkers[placa]);
@@ -511,7 +520,7 @@
 
         Object.keys(data).forEach(placa => {
           const m = data[placa];
-          const isOnline = m && m.online !== false && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
+          const isOnline = m && m.online !== false && m.bloqueado !== true && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
 
           if (isOnline && m.lat && m.lng) {
             if (driverMarkers[placa]) {
@@ -548,7 +557,6 @@
           attribution: '&copy; Google Satellite'
         });
 
-        // DEFINIDO COMO PADRÃO: Satélite inicia ativo
         googleSat.addTo(driverMap);
 
         L.control.layers({
@@ -571,7 +579,7 @@
       const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
       const driverRef = db.ref('motoristas/' + keyPlate);
 
-      driverRef.onDisconnect().remove();
+      driverRef.onDisconnect().update({ online: false });
 
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((pos) => {
@@ -587,7 +595,7 @@
             }
           }
 
-          driverRef.set({
+          driverRef.update({
             nome: currentUser.name,
             placa: currentUser.plate,
             lat: driverPos[0],
@@ -605,6 +613,33 @@
           }
         }, null, { enableHighAccuracy: true });
       }
+    }
+
+    function escutarStatusMotorista() {
+      const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+      driverStatusRef = db.ref('motoristas/' + keyPlate);
+
+      driverStatusRef.on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const saldoDevedor = data.saldoDevedor || 0;
+        isDriverBlocked = data.bloqueado === true;
+
+        const badge = document.getElementById('driver-badge');
+        badge.innerHTML = `${currentUser.name} (${currentUser.plate}) <br><span style="color: ${saldoDevedor > 0 ? '#ff5252' : '#69f0ae'}; font-weight:bold;">Taxas Devidas: R$ ${saldoDevedor.toFixed(2).replace('.', ',')}</span>`;
+
+        if (isDriverBlocked) {
+          document.getElementById('driver-blocked-card').style.display = 'block';
+          document.getElementById('driver-empty-box').style.display = 'none';
+          document.getElementById('driver-request-card').style.display = 'none';
+          document.getElementById('driver-pickup-card').style.display = 'none';
+          document.getElementById('driver-active-card').style.display = 'none';
+        } else {
+          document.getElementById('driver-blocked-card').style.display = 'none';
+          if (!activeRideId && !pendingRide) {
+            document.getElementById('driver-empty-box').style.display = 'block';
+          }
+        }
+      });
     }
 
     function carregarEExibirPassageirosNoMapaMotorista() {
@@ -654,7 +689,7 @@
 
         Object.keys(otherDriverMarkers).forEach(placa => {
           const m = data[placa];
-          const isOffline = !m || m.online === false || !m.updatedAt || (agora - m.updatedAt > CINCO_MINUTOS);
+          const isOffline = !m || m.online === false || m.bloqueado === true || m.updatedAt && (agora - m.updatedAt > CINCO_MINUTOS);
 
           if (isOffline || placa === minhaPlacaKey) {
             driverMap.removeLayer(otherDriverMarkers[placa]);
@@ -666,7 +701,7 @@
           if (placa === minhaPlacaKey) return;
 
           const m = data[placa];
-          const isOnline = m && m.online !== false && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
+          const isOnline = m && m.online !== false && m.bloqueado !== true && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
 
           if (isOnline && m.lat && m.lng) {
             if (otherDriverMarkers[placa]) {
@@ -863,6 +898,7 @@
 
     function escutarCorridasMotorista() {
       db.ref('corridas').on('value', (snapshot) => {
+        if (isDriverBlocked) return;
         const data = snapshot.val();
         
         let corridaEncontrada = null;
@@ -1009,7 +1045,7 @@
     }
 
     function confirmarAceiteCorrida() {
-      if (!pendingRide) return;
+      if (isDriverBlocked || !pendingRide) return;
       activeRideId = pendingRide.id;
       currentRideStatus = 'aceita';
 
@@ -1053,6 +1089,12 @@
 
       const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
 
+      // Incrementa R$ 1,00 de taxa de comissão no saldo devedor do motorista
+      const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+      db.ref('motoristas/' + keyPlate).child('saldoDevedor').transaction((currentBalance) => {
+        return (currentBalance || 0) + 1.00;
+      });
+
       const rideRef = db.ref('corridas/' + activeRideId);
       rideRef.remove();
 
@@ -1066,9 +1108,11 @@
       document.getElementById('driver-pickup-card').style.display = 'none';
       document.getElementById('driver-active-card').style.display = 'none';
       document.getElementById('driver-request-card').style.display = 'none';
-      document.getElementById('driver-empty-box').style.display = 'block';
+      if (!isDriverBlocked) {
+        document.getElementById('driver-empty-box').style.display = 'block';
+      }
 
-      alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}`);
+      alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}\n📝 Taxa de R$ 1,00 adicionada ao seu saldo devedor.`);
     }
 
     function sairDaConta() {
@@ -1076,13 +1120,12 @@
         wakeLock.release().then(() => { wakeLock = null; });
       }
 
-      limparRotaspng = null;
       limparRotasMapaMotorista();
 
       if (currentUser) {
         if (currentUser.role === 'motorista' && currentUser.plate) {
           const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
-          db.ref('motoristas/' + keyPlate).remove();
+          db.ref('motoristas/' + keyPlate).update({ online: false });
         } else if (currentUser.role === 'passageiro' && currentUser.phone) {
           const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '');
           if (keyPhone) db.ref('passageiros/' + keyPhone).remove();
