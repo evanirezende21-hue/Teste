@@ -19,8 +19,8 @@
 
     #auth-screen { background: #111; color: #fff; justify-content: center; align-items: center; padding: 20px; text-align: center; }
     .auth-card { background: #222; padding: 24px; border-radius: 16px; width: 100%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid #333; }
-    .auth-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-    .tab-btn { flex: 1; padding: 10px; border: none; background: #333; color: #888; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .auth-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+    .tab-btn { flex: 1; padding: 10px 4px; border: none; background: #333; color: #888; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; }
     .tab-btn.active { background: #ffc107; color: #000; }
 
     .form-group { text-align: left; margin-bottom: 14px; }
@@ -101,6 +101,17 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
     .leaflet-tooltip-bottom.custom-label::before { border-bottom-color: #222; }
+
+    /* ESTILOS PAINEL ADMIN */
+    #admin-screen { background: #181818; color: #fff; padding: 70px 16px 20px 16px; overflow-y: auto; }
+    .admin-card { background: #282828; border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid #3d3d3d; display: flex; flex-direction: column; gap: 8px; }
+    .admin-card-header { display: flex; justify-content: space-between; align-items: center; }
+    .admin-card-header strong { font-size: 16px; color: #ffc107; }
+    .admin-actions { display: flex; gap: 8px; margin-top: 6px; }
+    .admin-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; }
+    .btn-quitar { background: #2e7d32; color: #fff; }
+    .btn-bloquear { background: #c62828; color: #fff; }
+    .btn-desbloquear { background: #1565c0; color: #fff; }
   </style>
 </head>
 <body>
@@ -113,17 +124,20 @@
       <div class="auth-tabs">
         <button class="tab-btn active" id="tab-passenger" onclick="setRole('passageiro')">Passageiro</button>
         <button class="tab-btn" id="tab-driver" onclick="setRole('motorista')">Motorista</button>
+        <button class="tab-btn" id="tab-admin" onclick="setRole('admin')">Admin</button>
       </div>
 
-      <button class="btn-google" onclick="entrarComGoogle()">
-        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.76.53-1.78.9-3.12.9-2.38 0-4.41-1.57-5.13-3.72L.98 13.01C2.47 15.97 5.49 18 9 18z"/><path fill="#FBBC05" d="M3.87 10.8c-.19-.53-.3-1.1-.3-1.8s.11-1.27.3-1.8L.98 4.99C.35 6.24 0 7.65 0 9s.35 2.76.98 4.01l2.89-2.21z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.49 0 2.47 2.03.98 4.99l2.89 2.21C4.59 5.05 6.62 3.58 9 3.58z"/></svg>
-        ENTRAR COM O GOOGLE
-      </button>
+      <div id="google-btn-container">
+        <button class="btn-google" onclick="entrarComGoogle()">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.76.53-1.78.9-3.12.9-2.38 0-4.41-1.57-5.13-3.72L.98 13.01C2.47 15.97 5.49 18 9 18z"/><path fill="#FBBC05" d="M3.87 10.8c-.19-.53-.3-1.1-.3-1.8s.11-1.27.3-1.8L.98 4.99C.35 6.24 0 7.65 0 9s.35 2.76.98 4.01l2.89-2.21z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.49 0 2.47 2.03.98 4.99l2.89 2.21C4.59 5.05 6.62 3.58 9 3.58z"/></svg>
+          ENTRAR COM O GOOGLE
+        </button>
 
-      <div style="color: #666; font-size: 12px; margin-bottom: 16px;">— OU USE O CADASTRO MANUAL —</div>
+        <div style="color: #666; font-size: 12px; margin-bottom: 16px;">— OU USE O CADASTRO MANUAL —</div>
+      </div>
 
       <div id="form-container">
-        <div class="form-group">
+        <div class="form-group" id="group-name">
           <label>Seu Nome Completo</label>
           <input type="text" id="user-name" placeholder="Ex: João Silva" />
         </div>
@@ -136,6 +150,11 @@
         <div class="form-group" id="group-plate" style="display: none;">
           <label>Placa da Moto</label>
           <input type="text" id="user-plate" placeholder="Ex: ABC-1234" />
+        </div>
+
+        <div class="form-group" id="group-admin-pass" style="display: none;">
+          <label>Senha de Administrador</label>
+          <input type="password" id="admin-password" placeholder="Digite a senha admin" />
         </div>
 
         <button class="btn-primary" id="btn-login" onclick="entrarNoAppManual()">ENTRAR NO APP</button>
@@ -224,6 +243,26 @@
     </div>
   </div>
 
+  <!-- PAINEL ADMIN -->
+  <div id="admin-screen" class="screen">
+    <header style="background: #111; color: #ffc107;">
+      <div>
+        <span>Painel do Administrador</span>
+        <div class="user-badge" style="color: #aaa;">Gestão de Taxas e Bloqueios</div>
+      </div>
+      <button onclick="sairDaConta()">Sair</button>
+    </header>
+
+    <div style="margin-bottom: 16px;">
+      <h3 style="color: #ffc107; font-size: 18px; margin-bottom: 4px;">Motoristas Cadastrados</h3>
+      <p style="color: #aaa; font-size: 13px;">Gerencie o saldo de taxas e permissões dos motoristas.</p>
+    </div>
+
+    <div id="admin-drivers-list">
+      <!-- Lista preenchida em tempo real via JavaScript -->
+    </div>
+  </div>
+
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Leaflet Rotate JS -->
@@ -250,6 +289,8 @@
     const auth = firebase.auth();
 
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+    const ADMIN_PASSWORD_CORRETA = "1234"; // Defina aqui sua senha de administrador
 
     let currentRole = 'passageiro';
     let currentUser = null;
@@ -335,13 +376,20 @@
       localStorage.setItem('sjn_role', newRole);
       document.getElementById('tab-passenger').classList.toggle('active', newRole === 'passageiro');
       document.getElementById('tab-driver').classList.toggle('active', newRole === 'motorista');
+      document.getElementById('tab-admin').classList.toggle('active', newRole === 'admin');
+
+      document.getElementById('group-name').style.display = newRole === 'admin' ? 'none' : 'block';
       document.getElementById('group-phone').style.display = newRole === 'passageiro' ? 'block' : 'none';
       document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
+      document.getElementById('group-admin-pass').style.display = newRole === 'admin' ? 'block' : 'none';
+      document.getElementById('google-btn-container').style.display = newRole === 'admin' ? 'none' : 'block';
     }
 
     auth.onAuthStateChanged((user) => {
       if (user) {
         const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
+        if (savedRole === 'admin') return;
+
         const savedName = localStorage.getItem('sjn_name') || user.displayName || 'Usuário';
         const savedPhone = localStorage.getItem('sjn_phone') || user.phoneNumber || user.email || 'Google User';
         const savedPlate = localStorage.getItem('sjn_plate') || 'ABC-1234';
@@ -378,6 +426,21 @@
     }
 
     async function entrarNoAppManual() {
+      if (currentRole === 'admin') {
+        const pass = document.getElementById('admin-password').value.trim();
+        if (pass === ADMIN_PASSWORD_CORRETA) {
+          try {
+            await auth.signInAnonymously();
+            entrarPainelAdmin();
+          } catch (e) {
+            entrarPainelAdmin();
+          }
+        } else {
+          alert('Senha de Administrador incorreta!');
+        }
+        return;
+      }
+
       const name = document.getElementById('user-name').value.trim();
       const phone = document.getElementById('user-phone').value.trim();
       const plate = document.getElementById('user-plate').value.trim();
@@ -401,6 +464,67 @@
       }
     }
 
+    function entrarPainelAdmin() {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('admin-screen').classList.add('active');
+      carregarListaAdmin();
+    }
+
+    function carregarListaAdmin() {
+      db.ref('motoristas').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const container = document.getElementById('admin-drivers-list');
+        container.innerHTML = '';
+
+        const keys = Object.keys(data);
+        if (keys.length === 0) {
+          container.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">Nenhum motorista cadastrado ainda.</div>';
+          return;
+        }
+
+        keys.forEach(keyPlate => {
+          const m = data[keyPlate];
+          const saldo = (m.saldoDevedor || 0).toFixed(2).replace('.', ',');
+          const estaBloqueado = m.bloqueado === true;
+
+          const card = document.createElement('div');
+          card.className = 'admin-card';
+          card.innerHTML = `
+            <div class="admin-card-header">
+              <strong>${m.nome || 'Motorista'} (${m.placa || keyPlate})</strong>
+              <span style="font-size: 11px; padding: 3px 8px; border-radius: 10px; background: ${estaBloqueado ? '#c62828' : '#2e7d32'}; color: #fff;">
+                ${estaBloqueado ? 'SUSPENSO' : 'ATIVO'}
+              </span>
+            </div>
+            <div style="font-size: 14px; color: #ddd;">
+              Taxas Devidas: <strong style="color: ${m.saldoDevedor > 0 ? '#ff5252' : '#69f0ae'};">R$ ${saldo}</strong>
+            </div>
+            <div class="admin-actions">
+              <button class="admin-btn btn-quitar" onclick="quitarSaldoMotorista('${keyPlate}')">💵 Quitar (Pix OK)</button>
+              ${estaBloqueado 
+                ? `<button class="admin-btn btn-desbloquear" onclick="alternarBloqueioMotorista('${keyPlate}', false)">✅ Liberar</button>`
+                : `<button class="admin-btn btn-bloquear" onclick="alternarBloqueioMotorista('${keyPlate}', true)">🚫 Bloquear</button>`
+              }
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      });
+    }
+
+    function quitarSaldoMotorista(keyPlate) {
+      if (confirm(`Deseja dar baixa e zerar o saldo do motorista (${keyPlate})?`)) {
+        db.ref('motoristas/' + keyPlate).update({ saldoDevedor: 0 });
+      }
+    }
+
+    function alternarBloqueioMotorista(keyPlate, bloquear) {
+      const acao = bloquear ? 'bloquear/suspender' : 'liberar';
+      if (confirm(`Tem certeza que deseja ${acao} este motorista?`)) {
+        db.ref('motoristas/' + keyPlate).update({ bloqueado: bloquear });
+      }
+    }
+
     function entrarNoAppComDados(name, phone, plate) {
       currentUser = { name, phone, plate, role: currentRole };
 
@@ -415,7 +539,7 @@
           carregarEExibirMotoristasNoMapa();
         }, 150);
 
-      } else {
+      } else if (currentRole === 'motorista') {
         document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
         document.getElementById('driver-screen').classList.add('active');
         
@@ -1089,7 +1213,6 @@
 
       const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
 
-      // Incrementa R$ 1,00 de taxa de comissão no saldo devedor do motorista
       const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
       db.ref('motoristas/' + keyPlate).child('saldoDevedor').transaction((currentBalance) => {
         return (currentBalance || 0) + 1.00;
