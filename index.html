@@ -1022,12 +1022,14 @@
       document.getElementById('ride-details').style.display = 'none';
     }
 
+    // FUNÇÃO ATUALIZADA: Bloqueia recebimento de novas chamadas quando o motorista já aceitou ou está em corrida
     function escutarCorridasMotorista() {
       db.ref('corridas').on('value', (snapshot) => {
-        if (isDriverBlocked) return;
-        const data = snapshot.val();
+        if (isDriverBlocked || activeRideId !== null || currentRideStatus !== null) return;
         
+        const data = snapshot.val();
         let corridaEncontrada = null;
+        
         if (data) {
           Object.keys(data).forEach(key => {
             if (data[key].status === 'solicitada' && !activeRideId) {
