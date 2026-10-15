@@ -1022,28 +1022,31 @@
       document.getElementById('ride-details').style.display = 'none';
     }
 
-    // FUNÇÃO ATUALIZADA: Bloqueia recebimento de novas chamadas quando o motorista já aceitou ou está em corrida
+    // OUVINTE DE CORRIDAS CONTINUO E AUTOMÁTICO
     function escutarCorridasMotorista() {
       db.ref('corridas').on('value', (snapshot) => {
-        if (isDriverBlocked || activeRideId !== null || currentRideStatus !== null) return;
+        if (isDriverBlocked) return;
+        
+        // Se o motorista estiver ocupado com uma corrida aceita ou em andamento, não processa novos alertas no card
+        if (activeRideId !== null) return;
         
         const data = snapshot.val();
         let corridaEncontrada = null;
         
         if (data) {
           Object.keys(data).forEach(key => {
-            if (data[key].status === 'solicitada' && !activeRideId) {
+            if (data[key].status === 'solicitada') {
               corridaEncontrada = data[key];
             }
           });
         }
 
-        if (corridaEncontrada && !activeRideId) {
+        if (corridaEncontrada) {
           pendingRide = corridaEncontrada;
           currentRideStatus = 'solicitada';
           const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
           
-          document.getElementById('driver-empty-box').style.display = 'block';
+          document.getElementById('driver-empty-box').style.display = 'none';
           document.getElementById('driver-request-card').style.display = 'block';
           document.getElementById('driver-pickup-card').style.display = 'none';
           document.getElementById('driver-active-card').style.display = 'none';
@@ -1058,7 +1061,7 @@
             alertarMotoristaComSom();
           }
 
-        } else if (!activeRideId && !corridaEncontrada) {
+        } else {
           pendingRide = null;
           currentRideStatus = null;
           lastNotifiedRideId = null;
@@ -1222,9 +1225,9 @@
         return (currentBalance || 0) + 1.00;
       });
 
-      const rideRef = db.ref('corridas/' + activeRideId);
-      rideRef.remove();
+      const idCorridaEncerrada = activeRideId;
 
+      // Zera o estado do motorista antes de remover a corrida do banco de dados
       activeRideId = null;
       pendingRide = null;
       currentRideStatus = null;
@@ -1239,7 +1242,13 @@
         document.getElementById('driver-empty-box').style.display = 'block';
       }
 
+      // Remove a corrida do Firebase
+      db.ref('corridas/' + idCorridaEncerrada).remove();
+
       alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}\n📝 Taxa de R$ 1,00 adicionada ao seu saldo devedor.`);
+
+      // Força a checagem imediata do banco de dados para puxar uma segunda corrida pendente na hora
+      db.ref('corridas').once('value');
     }
 
     function sairDaConta() {
