@@ -385,36 +385,73 @@
       document.getElementById('google-btn-container').style.display = newRole === 'admin' ? 'none' : 'block';
     }
 
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
       if (user) {
         const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
         if (savedRole === 'admin') return;
 
-        const savedName = localStorage.getItem('sjn_name') || user.displayName || 'Usuário';
-        const savedPhone = localStorage.getItem('sjn_phone') || user.phoneNumber || user.email || 'Google User';
-        const savedPlate = localStorage.getItem('sjn_plate') || 'ABC-1234';
-        
+        let savedName = localStorage.getItem('sjn_name') || user.displayName || 'Usuário';
+        let savedPhone = localStorage.getItem('sjn_phone') || user.phoneNumber || user.email || 'Google User';
+        let savedPlate = localStorage.getItem('sjn_plate') || '';
+
+        // Se for motorista, busca a placa cadastrada no Firebase para o UID do usuário
+        if (savedRole === 'motorista' && user.uid) {
+          try {
+            const snap = await db.ref('usuarios/' + user.uid).once('value');
+            const userData = snap.val();
+            if (userData && userData.placa) {
+              savedPlate = userData.placa;
+              localStorage.setItem('sjn_plate', savedPlate);
+            }
+          } catch (e) {
+            console.error("Erro ao buscar dados do usuário:", e);
+          }
+        }
+
         currentRole = savedRole;
+        if (currentRole === 'motorista' && !savedPlate) {
+          // Se for motorista e não tiver placa ainda, permanece na tela de login para informar
+          return;
+        }
+
         entrarNoAppComDados(savedName, savedPhone, savedPlate);
       }
     });
 
     async function entrarComGoogle() {
-      const plateInput = document.getElementById('user-plate').value.trim();
-      const nameInput = document.getElementById('user-name').value.trim();
-      
-      if (currentRole === 'motorista' && !plateInput && !localStorage.getItem('sjn_plate')) {
-        alert('Motorista: Por favor, digite a Placa da sua moto antes de entrar com o Google.');
-        return;
-      }
-
-      if (plateInput) localStorage.setItem('sjn_plate', plateInput);
-      if (nameInput) localStorage.setItem('sjn_name', nameInput);
+      let plateInput = document.getElementById('user-plate').value.trim();
+      let nameInput = document.getElementById('user-name').value.trim();
       localStorage.setItem('sjn_role', currentRole);
 
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
-        await auth.signInWithPopup(provider);
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+
+        if (currentRole === 'motorista') {
+          const userRef = db.ref('usuarios/' + user.uid);
+          const snap = await userRef.once('value');
+          const userData = snap.val();
+
+          if (userData && userData.placa) {
+            plateInput = userData.placa;
+          } else if (plateInput) {
+            await userRef.set({
+              nome: user.displayName || nameInput,
+              email: user.email,
+              placa: plateInput,
+              role: 'motorista'
+            });
+          } else {
+            alert('Motorista: Por favor, digite a Placa da sua moto para concluir o primeiro cadastro.');
+            return;
+          }
+
+          localStorage.setItem('sjn_plate', plateInput);
+        }
+
+        if (nameInput) localStorage.setItem('sjn_name', nameInput);
+
       } catch (error) {
         try {
           await auth.signInWithRedirect(provider);
@@ -456,7 +493,14 @@
       localStorage.setItem('sjn_role', currentRole);
 
       try {
-        await auth.signInAnonymously();
+        const cred = await auth.signInAnonymously();
+        if (currentRole === 'motorista' && cred.user) {
+          db.ref('usuarios/' + cred.user.uid).set({
+            nome: name,
+            placa: plate,
+            role: 'motorista'
+          });
+        }
         entrarNoAppComDados(name, phone, plate);
       } catch (error) {
         console.error("Erro no login anônimo:", error);
@@ -1022,12 +1066,10 @@
       document.getElementById('ride-details').style.display = 'none';
     }
 
-    // OUVINTE DE CORRIDAS CONTINUO E AUTOMÁTICO
     function escutarCorridasMotorista() {
       db.ref('corridas').on('value', (snapshot) => {
         if (isDriverBlocked) return;
         
-        // Se o motorista estiver ocupado com uma corrida aceita ou em andamento, não processa novos alertas no card
         if (activeRideId !== null) return;
         
         const data = snapshot.val();
@@ -1227,7 +1269,6 @@
 
       const idCorridaEncerrada = activeRideId;
 
-      // Zera o estado do motorista antes de remover a corrida do banco de dados
       activeRideId = null;
       pendingRide = null;
       currentRideStatus = null;
@@ -1242,12 +1283,10 @@
         document.getElementById('driver-empty-box').style.display = 'block';
       }
 
-      // Remove a corrida do Firebase
       db.ref('corridas/' + idCorridaEncerrada).remove();
 
       alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}\n📝 Taxa de R$ 1,00 adicionada ao seu saldo devedor.`);
 
-      // Força a checagem imediata do banco de dados para puxar uma segunda corrida pendente na hora
       db.ref('corridas').once('value');
     }
 
