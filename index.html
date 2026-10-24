@@ -370,7 +370,7 @@
     let valorEstimado = 0;
     let distanciaKm = 0;
 
-    const TAXA_MINIMA = 6.85;
+    const TAXA_MINIMA = 6.86;
     const PRECO_POR_KM = 2.50;
 
     const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
@@ -386,7 +386,7 @@
       popupAnchor: [0, -18]
     });
 
-    // --- RECONHECIMENTO DE VOZ E BUSCA DE ENDEREÇO ---
+    // --- RECONHECIMENTO DE VOZ E BUSCA LOCAL DE ENDEREÇO ---
     function iniciarReconhecimentoVoz() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -421,22 +421,37 @@
     }
 
     async function buscarEndereçoPorTexto(textoBusca) {
-      const query = textoBusca || document.getElementById('destination-input').value.trim();
-      if (!query) return;
+      const rawQuery = textoBusca || document.getElementById('destination-input').value.trim();
+      if (!rawQuery) return;
+
+      // Adiciona o nome da cidade por padrão se não foi informado explicitamente
+      let queryCompleta = rawQuery;
+      if (!rawQuery.toLowerCase().includes('são joão nepomuceno') && !rawQuery.toLowerCase().includes('sjn')) {
+        queryCompleta = `${rawQuery}, São João Nepomuceno - MG`;
+      }
 
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
-        const res = await fetch(url);
-        const data = await res.json();
+        // viewbox delimita a busca nas proximidades das coordenadas da cidade (-43.05 a -42.97, -21.58 a -21.50)
+        const viewbox = "-43.05,-21.50,-42.97,-21.58";
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryCompleta)}&bounded=1&viewbox=${viewbox}&limit=1`;
+        
+        let res = await fetch(url);
+        let data = await res.json();
+
+        // Se a busca delimitada não encontrar nada, tenta uma busca geral na cidade
+        if (!data || data.length === 0) {
+          const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryCompleta)}&limit=1`;
+          res = await fetch(fallbackUrl);
+          data = await res.json();
+        }
 
         if (data && data.length > 0) {
           const lat = parseFloat(data[0].lat);
           const lon = parseFloat(data[0].lon);
           
-          // Trata como clique no mapa
           onPassengerMapClick({ latlng: { lat, lng: lon } });
         } else {
-          alert("Endereço não encontrado. Tente indicar mais detalhes como rua e cidade.");
+          alert("Endereço não encontrado em São João Nepomuceno. Tente indicar mais detalhes da rua ou ponto de referência.");
         }
       } catch (e) {
         console.error("Erro na busca de endereço:", e);
