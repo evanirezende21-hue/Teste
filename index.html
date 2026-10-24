@@ -64,6 +64,51 @@
     .price-tag { font-size: 26px; font-weight: bold; color: #2e7d32; }
     .info-text { font-size: 14px; color: #555; margin-bottom: 8px; }
 
+    /* ESTILOS DA PESQUISA POR VOZ E TEXTO */
+    .search-box {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .search-input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      outline: none;
+    }
+    .btn-mic {
+      background: #2196f3;
+      color: white;
+      border: none;
+      padding: 0 14px;
+      border-radius: 10px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-mic.listening {
+      background: #f44336;
+      animation: pulse 1s infinite;
+    }
+    .btn-search {
+      background: #ffc107;
+      color: black;
+      border: none;
+      padding: 0 14px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
     .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
     .btn-success { background: #27ae60; color: #fff; }
@@ -175,7 +220,14 @@
     <div id="passenger-map" class="map-container"></div>
 
     <div class="bottom-card">
-      <div class="info-text" id="instruction-text">👉 Toque em qualquer ponto do mapa para marcar o destino.</div>
+      <!-- CAMPO DE PESQUISA POR VOZ E TEXTO -->
+      <div class="search-box">
+        <input type="text" id="destination-input" class="search-input" placeholder="Fale ou digite o endereço..." />
+        <button class="btn-mic" id="btn-voice" onclick="iniciarReconhecimentoVoz()" title="Falar Endereço">🎙️</button>
+        <button class="btn-search" onclick="buscarEndereçoPorTexto()">Buscar</button>
+      </div>
+
+      <div class="info-text" id="instruction-text">👉 Diga o endereço, digite acima ou toque no mapa.</div>
       <div id="status-box" style="display: none; font-size: 15px; font-weight: bold; color: #d35400; margin-bottom: 10px;"></div>
       
       <div id="ride-details" style="display: none;">
@@ -318,7 +370,7 @@
     let valorEstimado = 0;
     let distanciaKm = 0;
 
-    const TAXA_MINIMA = 6.75;
+    const TAXA_MINIMA = 6.85;
     const PRECO_POR_KM = 2.50;
 
     const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
@@ -333,6 +385,64 @@
       iconAnchor: [18, 18],
       popupAnchor: [0, -18]
     });
+
+    // --- RECONHECIMENTO DE VOZ E BUSCA DE ENDEREÇO ---
+    function iniciarReconhecimentoVoz() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("O seu navegador não suporta reconhecimento de voz. Por favor, digite o endereço.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.interimResults = false;
+
+      const btnMic = document.getElementById('btn-voice');
+      btnMic.classList.add('listening');
+
+      recognition.start();
+
+      recognition.onresult = (event) => {
+        btnMic.classList.remove('listening');
+        const textoFalar = event.results[0][0].transcript;
+        document.getElementById('destination-input').value = textoFalar;
+        buscarEndereçoPorTexto(textoFalar);
+      };
+
+      recognition.onerror = (event) => {
+        btnMic.classList.remove('listening');
+        alert("Não foi possível entender a voz. Tente falar novamente ou digite.");
+      };
+
+      recognition.onend = () => {
+        btnMic.classList.remove('listening');
+      };
+    }
+
+    async function buscarEndereçoPorTexto(textoBusca) {
+      const query = textoBusca || document.getElementById('destination-input').value.trim();
+      if (!query) return;
+
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          
+          // Trata como clique no mapa
+          onPassengerMapClick({ latlng: { lat, lng: lon } });
+        } else {
+          alert("Endereço não encontrado. Tente indicar mais detalhes como rua e cidade.");
+        }
+      } catch (e) {
+        console.error("Erro na busca de endereço:", e);
+        alert("Erro ao pesquisar o endereço.");
+      }
+    }
 
     function alertarMotoristaComSom() {
       if (isDriverBlocked) return;
@@ -394,7 +504,6 @@
         let savedPhone = localStorage.getItem('sjn_phone') || user.phoneNumber || user.email || 'Google User';
         let savedPlate = localStorage.getItem('sjn_plate') || '';
 
-        // Se for motorista, busca a placa cadastrada no Firebase para o UID do usuário
         if (savedRole === 'motorista' && user.uid) {
           try {
             const snap = await db.ref('usuarios/' + user.uid).once('value');
@@ -410,7 +519,6 @@
 
         currentRole = savedRole;
         if (currentRole === 'motorista' && !savedPlate) {
-          // Se for motorista e não tiver placa ainda, permanece na tela de login para informar
           return;
         }
 
