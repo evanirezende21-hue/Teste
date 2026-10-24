@@ -424,21 +424,18 @@
       const rawQuery = textoBusca || document.getElementById('destination-input').value.trim();
       if (!rawQuery) return;
 
-      // Adiciona o nome da cidade por padrão se não foi informado explicitamente
       let queryCompleta = rawQuery;
       if (!rawQuery.toLowerCase().includes('são joão nepomuceno') && !rawQuery.toLowerCase().includes('sjn')) {
         queryCompleta = `${rawQuery}, São João Nepomuceno - MG`;
       }
 
       try {
-        // viewbox delimita a busca nas proximidades das coordenadas da cidade (-43.05 a -42.97, -21.58 a -21.50)
         const viewbox = "-43.05,-21.50,-42.97,-21.58";
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryCompleta)}&bounded=1&viewbox=${viewbox}&limit=1`;
         
         let res = await fetch(url);
         let data = await res.json();
 
-        // Se a busca delimitada não encontrar nada, tenta uma busca geral na cidade
         if (!data || data.length === 0) {
           const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryCompleta)}&limit=1`;
           res = await fetch(fallbackUrl);
@@ -1103,6 +1100,9 @@
 
       newRideRef.set(rideData);
 
+      // Limpa o campo de pesquisa/endereço ao solicitar a corrida
+      document.getElementById('destination-input').value = '';
+
       document.getElementById('ride-details').style.display = 'none';
       document.getElementById('status-box').style.display = 'block';
       document.getElementById('status-box').style.color = '#d35400';
@@ -1180,6 +1180,9 @@
 
       activeRideId = null;
       destino = null;
+
+      // Limpa o campo de endereço também ao resetar
+      document.getElementById('destination-input').value = '';
 
       const statusBox = document.getElementById('status-box');
       statusBox.style.display = 'none';
