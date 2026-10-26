@@ -11,18 +11,32 @@ jobs:
       - name: Baixar Código do Repositório
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
+      - name: Configurar Java JDK 17
+        uses: actions/setup-java@v4
         with:
-          node-version: 18
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Gerar APK via PWABuilder CLI
+      - name: Gerar Projeto Android PWA
+        uses: pwa-builder/pwa-action@v1.0.1
+        with:
+          manifest_url: 'https://evanirezende21-hue.github.io/Teste/manifest.json'
+
+      - name: Dar Permissão ao Gradle
         run: |
-          npm install -g @pwabuilder/cli
-          pwabuilder package --manifest https://evanirezende21-hue.github.io/Teste/manifest.json --platforms android --directory output-apk
+          cd pwa-builder-android || true
+          chmod +x gradlew || true
+
+      - name: Compilar APK Debug com Gradle
+        run: |
+          cd pwa-builder-android || true
+          ./gradlew assembleDebug
 
       - name: Salvar APK como Artefato
         uses: actions/upload-artifact@v4
         with:
           name: moto-taxi-sjn-apk
-          path: output-apk/
+          path: |
+            pwa-builder-android/app/build/outputs/apk/debug/*.apk
+            pwa-builder-android/*.apk
+            *.apk
