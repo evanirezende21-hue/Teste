@@ -1,10 +1,12 @@
 name: Gerar APK Android
 
 on:
-  workflow_dispatch: # Adiciona o botão para gerar manualmente!
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão do App'
+        required: false
+        default: '1.0.0'
 
 jobs:
   build:
@@ -14,20 +16,14 @@ jobs:
       - name: Baixar Código do Repositório
         uses: actions/checkout@v4
 
-      - name: Gerar APK via PWABuilder API
-        run: |
-          mkdir -p dist
-          curl -X POST "https://pwabuilder-cloudapk.azurewebsites.net/app" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "manifestUrl": "https://evanirezende21-hue.github.io/Teste/manifest.json",
-              "appUrl": "https://evanirezende21-hue.github.io/Teste/",
-              "appName": "Moto Táxi SJN",
-              "packageId": "com.mototaxisjn.app"
-            }' --output dist/moto-taxi-sjn.apk || true
+      - name: Criar APK Direto via PWA
+        uses: pwa-builder/pwa-action@v1
+        with:
+          manifest_url: 'https://evanirezende21-hue.github.io/Teste/manifest.json'
+          output_dir: 'apk-output'
 
       - name: Salvar APK como Artefato
         uses: actions/upload-artifact@v4
         with:
           name: moto-taxi-sjn-apk
-          path: dist/
+          path: apk-output/
