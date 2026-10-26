@@ -13,14 +13,28 @@ jobs:
       - name: Baixar Código do Repositório
         uses: actions/checkout@v4
 
-      - name: Gerar APK a partir do PWA
-        uses: pwa-builder/pwa-action@v1
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
-          manifest_url: 'https://evanirezende21-hue.github.io/Teste/manifest.json'
-          output_dir: 'dist'
+          node-version: 18
 
-      - name: Salvar APK como Artefato
+      - name: Configurar Java JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar PWABuilder CLI
+        run: npm install -g @pwabuilder/cli
+
+      - name: Gerar Projeto Android
+        run: pwabuilder pwa-url https://evanirezende21-hue.github.io/Teste/manifest.json --platform android --output ./android-app
+
+      - name: Salvar Artefato
         uses: actions/upload-artifact@v4
         with:
           name: moto-taxi-sjn-apk
-          path: dist/*
+          path: android-app/*
