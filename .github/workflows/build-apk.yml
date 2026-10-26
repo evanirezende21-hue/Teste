@@ -3,7 +3,7 @@ name: Gerar APK Android
 on:
   push:
     branches:
-      - main  # ou 'master', dependendo do nome da sua branch principal
+      - main
 
 jobs:
   build:
@@ -11,24 +11,16 @@ jobs:
 
     steps:
       - name: Baixar Código do Repositório
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v3
+      - name: Gerar APK a partir do PWA
+        uses: pwa-builder/pwa-action@v1
         with:
-          node-version: 18
-
-      - name: Instalar Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
-
-      - name: Gerar Projeto Android e Compilar APK
-        run: |
-          npx @bubblewrap/cli init --manifest=https://${{ github.actor }}.github.io/${{ github.event.repository.name }}/manifest.json --directory=android-project
-          cd android-project
-          npx @bubblewrap/cli build
+          manifest_url: 'https://evanirezende21-hue.github.io/Teste/manifest.json'
+          output_dir: 'dist'
 
       - name: Salvar APK como Artefato
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: moto-taxi-sjn-apk
-          path: android-project/app-release-signed.apk
+          path: dist/*
