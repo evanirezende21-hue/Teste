@@ -1,39 +1,27 @@
-name: Gerar APK Android
+name: Gerar APK Moto Táxi SJN
 
 on:
+  push:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Baixar Código do Repositório
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configurar Java 17
-        uses: actions/setup-java@v4
+      - uses: subosito/flutter-action@v2
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          channel: 'stable'
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
+      - name: Instalar dependencias
+        run: flutter pub get
+
+      - name: Compilar APK Release
+        run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
         with:
-          node-version: 18
-
-      - name: Criar e Compilar App Android
-        run: |
-          npm install -g @bubblewrap/cli
-          bubblewrap init --manifest=https://evanirezende21-hue.github.io/Teste/manifest.json --directory=android-app --skip-integrity-validation || true
-          cd android-app
-          chmod +x gradlew || true
-          ./gradlew assembleDebug
-
-      - name: Salvar APK Gerado
-        uses: actions/upload-artifact@v4
-        with:
-          name: moto-taxi-sjn-apk
-          path: |
-            android-app/app/build/outputs/apk/debug/*.apk
-            android-app/*.apk
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
