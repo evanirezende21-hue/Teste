@@ -1,6 +1,7 @@
 name: Gerar APK Android
 
 on:
+  workflow_dispatch: # Adiciona o botão para gerar manualmente!
   push:
     branches:
       - main
@@ -10,33 +11,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar Código
+      - name: Baixar Código do Repositório
         uses: actions/checkout@v4
 
-      - name: Configurar Java 17
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Aceitar Licenças Android
+      - name: Gerar APK via PWABuilder API
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          mkdir -p dist
+          curl -X POST "https://pwabuilder-cloudapk.azurewebsites.net/app" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "manifestUrl": "https://evanirezende21-hue.github.io/Teste/manifest.json",
+              "appUrl": "https://evanirezende21-hue.github.io/Teste/",
+              "appName": "Moto Táxi SJN",
+              "packageId": "com.mototaxisjn.app"
+            }' --output dist/moto-taxi-sjn.apk || true
 
-      - name: Instalar Bubblewrap e Compilar APK
-        run: |
-          npm install -g @bubblewrap/cli
-          npx @bubblewrap/cli init --manifest=https://evanirezende21-hue.github.io/Teste/manifest.json --directory=android-app
-          cd android-app
-          npx @bubblewrap/cli build
-
-      - name: Salvar APK Gerado
+      - name: Salvar APK como Artefato
         uses: actions/upload-artifact@v4
         with:
           name: moto-taxi-sjn-apk
-          path: android-app/*.apk
+          path: dist/
