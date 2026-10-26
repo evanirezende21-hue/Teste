@@ -227,7 +227,6 @@
         <button class="btn-search" onclick="buscarEndereçoPorTexto()">Buscar</button>
       </div>
 
-      <!-- INSTRUÇÃO LIMPA (SEM DUPLICIDADE) -->
       <div class="info-text" id="instruction-text">👉 Ou toque no mapa para marcar o destino.</div>
       <div id="status-box" style="display: none; font-size: 15px; font-weight: bold; color: #d35400; margin-bottom: 10px;"></div>
       
@@ -1025,7 +1024,7 @@
           distanciaKm = data.routes[0].distance / 1000;
           
           let valorBruto = TAXA_MINIMA + (distanciaKm * PRECO_POR_KM);
-          valorEstimado = Math.round(valorBruto * 100) / 100;
+          valorEstimado = Math.round(valorBruto);
 
           if (valorEstimado < TAXA_MINIMA) {
             valorEstimado = TAXA_MINIMA;
