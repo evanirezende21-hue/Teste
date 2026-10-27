@@ -1,0 +1,34 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "usuarios": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "motoristas": {
+      "$placa": {
+        ".read": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() === 'admin' || root.child('usuarios').child(auth.uid).child('placa').val() === $placa)",
+        ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() === 'admin' || root.child('usuarios').child(auth.uid).child('placa').val() === $placa)"
+      }
+    },
+
+    "passageiros": {
+      "$telefone": {
+        ".read": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() === 'admin' || root.child('usuarios').child(auth.uid).child('phone').val() === $telefone)",
+        ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() === 'admin' || root.child('usuarios').child(auth.uid).child('phone').val() === $telefone)"
+      }
+    },
+
+    "corridas": {
+      "$rideId": {
+        ".read": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() === 'admin' || root.child('usuarios').child(auth.uid).child('phone').val() === data.child('telefone').val() || root.child('usuarios').child(auth.uid).child('placa').val() === data.child('placa_motorista').val())",
+        ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() === 'admin' || root.child('usuarios').child(auth.uid).child('phone').val() === newData.child('telefone').val() || root.child('usuarios').child(auth.uid).child('placa').val() === newData.child('placa_motorista').val())"
+      }
+    }
+  }
+}
