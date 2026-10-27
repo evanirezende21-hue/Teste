@@ -1,0 +1,72 @@
+import { db } from '../config/firebase.js';
+
+export function carregarListaAdmin() {
+  const container = document.getElementById('admin-drivers-list');
+  if (!container) return;
+
+  db.ref('motoristas').on('value', (snapshot) => {
+    const data = snapshot.val() || {};
+    const keys = Object.keys(data);
+
+    container.innerHTML = '';
+
+    if (!keys.length) {
+      container.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">Nenhum motorista cadastrado ainda.</div>';
+      return;
+    }
+
+    keys.forEach((keyPlate) => {
+      const driver = data[keyPlate];
+      const saldo = (driver.saldoDevedor || 0).toFixed(2).replace('.', ',');
+      const blocked = driver.bloqueado === true;
+
+      const card = document.createElement('div');
+      card.className = 'admin-card';
+      card.innerHTML = `
+        <div class="admin-card-header">
+          <strong>${driver.nome || 'Motorista'} (${driver.placa || keyPlate})</strong>
+          <span style="font-size: 11px; padding: 3px 8px; border-radius: 10px; background: ${blocked ? '#c62828' : '#2e7d32'}; color: #fff;">${blocked ? 'SUSPENSO' : 'ATIVO'}</span>
+        </div>
+        <div style="font-size: 14px; color: #ddd;">
+          Taxas Devidas: <strong style="color: ${driver.saldoDevedor > 0 ? '#ff5252' : '#69f0ae'};">R$ ${saldo}</strong>
+        </div>
+        <div class="admin-actions">
+          <button class="admin-btn btn-quitar" onclick="quitarSaldoMotorista('${keyPlate}')">💵 Quitar</button>
+          ${blocked
+            ? `<button class="admin-btn btn-desbloquear" onclick="alternarBloqueioMotorista('${keyPlate}', false)">✅ Liberar</button>`
+            : `<button class="admin-btn btn-bloquear" onclick="alternarBloqueioMotorista('${keyPlate}', true)">🚫 Bloquear</button>`
+          }
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  });
+}
+
+export function quitarSaldoMotorista(keyPlate) {
+  if (confirm(`Deseja zerar o saldo do motorista (${keyPlate})?`)) {
+    db.ref('motoristas/' + keyPlate).update({ saldoDevedor: 0 });
+  }
+}
+
+export function alternarBloqueioMotorista(keyPlate, bloquear) {
+  const action = bloquear ? 'bloquear/suspender' : 'liberar';
+  if (confirm(`Tem certeza que deseja ${action} este motorista?`)) {
+    db.ref('motoristas/' + keyPlate).update({ bloqueado: bloquear });
+  }
+}
+
+export function initAdminController() {
+  window.quitarSaldoMotorista = quitarSaldoMotorista;
+  window.alternarBloqueioMotorista = alternarBloqueioMotorista;
+  window.carregarListaAdmin = carregarListaAdmin;
+
+  const adminScreen = document.getElementById('admin-screen');
+  if (adminScreen) {
+    adminScreen.addEventListener('click', () => {
+      if (document.getElementById('admin-drivers-list')) {
+        carregarListaAdmin();
+      }
+    });
+  }
+}
