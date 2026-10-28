@@ -64,51 +64,6 @@
     .price-tag { font-size: 26px; font-weight: bold; color: #2e7d32; }
     .info-text { font-size: 14px; color: #555; margin-bottom: 8px; }
 
-    /* ESTILOS DA PESQUISA POR VOZ E TEXTO */
-    .search-box {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .search-input {
-      flex: 1;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      font-size: 14px;
-      outline: none;
-    }
-    .btn-mic {
-      background: #2196f3;
-      color: white;
-      border: none;
-      padding: 0 14px;
-      border-radius: 10px;
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .btn-mic.listening {
-      background: #f44336;
-      animation: pulse 1s infinite;
-    }
-    .btn-search {
-      background: #ffc107;
-      color: black;
-      border: none;
-      padding: 0 14px;
-      border-radius: 10px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.08); }
-      100% { transform: scale(1); }
-    }
-
     .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
     .btn-success { background: #27ae60; color: #fff; }
@@ -220,14 +175,7 @@
     <div id="passenger-map" class="map-container"></div>
 
     <div class="bottom-card">
-      <!-- CAMPO DE PESQUISA POR VOZ E TEXTO -->
-      <div class="search-box">
-        <input type="text" id="destination-input" class="search-input" placeholder="Fale ou digite o endereço..." />
-        <button class="btn-mic" id="btn-voice" onclick="iniciarReconhecimentoVoz()" title="Falar Endereço">🎙️</button>
-        <button class="btn-search" onclick="buscarEndereçoPorTexto()">Buscar</button>
-      </div>
-
-      <div class="info-text" id="instruction-text">👉 Ou toque no mapa para marcar o destino.</div>
+      <div class="info-text" id="instruction-text">👉 Toque em qualquer ponto do mapa para marcar o destino.</div>
       <div id="status-box" style="display: none; font-size: 15px; font-weight: bold; color: #d35400; margin-bottom: 10px;"></div>
       
       <div id="ride-details" style="display: none;">
@@ -342,7 +290,7 @@
 
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
-    const ADMIN_PASSWORD_CORRETA = "Rinaverinave32@";
+    const ADMIN_PASSWORD_CORRETA = "Rinaverinave32@"; // Defina aqui sua senha de administrador
 
     let currentRole = 'passageiro';
     let currentUser = null;
@@ -370,7 +318,7 @@
     let valorEstimado = 0;
     let distanciaKm = 0;
 
-    const TAXA_MINIMA = 6.68;
+    const TAXA_MINIMA = 10.00;
     const PRECO_POR_KM = 2.50;
 
     const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
@@ -385,76 +333,6 @@
       iconAnchor: [18, 18],
       popupAnchor: [0, -18]
     });
-
-    // --- RECONHECIMENTO DE VOZ E BUSCA LOCAL DE ENDEREÇO ---
-    function iniciarReconhecimentoVoz() {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        alert("O seu navegador não suporta reconhecimento de voz. Por favor, digite o endereço.");
-        return;
-      }
-
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'pt-BR';
-      recognition.interimResults = false;
-
-      const btnMic = document.getElementById('btn-voice');
-      btnMic.classList.add('listening');
-
-      recognition.start();
-
-      recognition.onresult = (event) => {
-        btnMic.classList.remove('listening');
-        const textoFalar = event.results[0][0].transcript;
-        document.getElementById('destination-input').value = textoFalar;
-        buscarEndereçoPorTexto(textoFalar);
-      };
-
-      recognition.onerror = (event) => {
-        btnMic.classList.remove('listening');
-        alert("Não foi possível entender a voz. Tente falar novamente ou digite.");
-      };
-
-      recognition.onend = () => {
-        btnMic.classList.remove('listening');
-      };
-    }
-
-    async function buscarEndereçoPorTexto(textoBusca) {
-      const rawQuery = textoBusca || document.getElementById('destination-input').value.trim();
-      if (!rawQuery) return;
-
-      let queryCompleta = rawQuery;
-      if (!rawQuery.toLowerCase().includes('são joão nepomuceno') && !rawQuery.toLowerCase().includes('sjn')) {
-        queryCompleta = `${rawQuery}, São João Nepomuceno - MG`;
-      }
-
-      try {
-        const viewbox = "-43.05,-21.50,-42.97,-21.58";
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryCompleta)}&bounded=1&viewbox=${viewbox}&limit=1`;
-        
-        let res = await fetch(url);
-        let data = await res.json();
-
-        if (!data || data.length === 0) {
-          const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryCompleta)}&limit=1`;
-          res = await fetch(fallbackUrl);
-          data = await res.json();
-        }
-
-        if (data && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          
-          onPassengerMapClick({ latlng: { lat, lng: lon } });
-        } else {
-          alert("Endereço não encontrado em São João Nepomuceno. Tente indicar mais detalhes da rua ou ponto de referência.");
-        }
-      } catch (e) {
-        console.error("Erro na busca de endereço:", e);
-        alert("Erro ao pesquisar o endereço.");
-      }
-    }
 
     function alertarMotoristaComSom() {
       if (isDriverBlocked) return;
@@ -507,71 +385,36 @@
       document.getElementById('google-btn-container').style.display = newRole === 'admin' ? 'none' : 'block';
     }
 
-    auth.onAuthStateChanged(async (user) => {
+    auth.onAuthStateChanged((user) => {
       if (user) {
         const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
         if (savedRole === 'admin') return;
 
-        let savedName = localStorage.getItem('sjn_name') || user.displayName || 'Usuário';
-        let savedPhone = localStorage.getItem('sjn_phone') || user.phoneNumber || user.email || 'Google User';
-        let savedPlate = localStorage.getItem('sjn_plate') || '';
-
-        if (savedRole === 'motorista' && user.uid) {
-          try {
-            const snap = await db.ref('usuarios/' + user.uid).once('value');
-            const userData = snap.val();
-            if (userData && userData.placa) {
-              savedPlate = userData.placa;
-              localStorage.setItem('sjn_plate', savedPlate);
-            }
-          } catch (e) {
-            console.error("Erro ao buscar dados do usuário:", e);
-          }
-        }
-
+        const savedName = localStorage.getItem('sjn_name') || user.displayName || 'Usuário';
+        const savedPhone = localStorage.getItem('sjn_phone') || user.phoneNumber || user.email || 'Google User';
+        const savedPlate = localStorage.getItem('sjn_plate') || 'ABC-1234';
+        
         currentRole = savedRole;
-        if (currentRole === 'motorista' && !savedPlate) {
-          return;
-        }
-
         entrarNoAppComDados(savedName, savedPhone, savedPlate);
       }
     });
 
     async function entrarComGoogle() {
-      let plateInput = document.getElementById('user-plate').value.trim();
-      let nameInput = document.getElementById('user-name').value.trim();
+      const plateInput = document.getElementById('user-plate').value.trim();
+      const nameInput = document.getElementById('user-name').value.trim();
+      
+      if (currentRole === 'motorista' && !plateInput && !localStorage.getItem('sjn_plate')) {
+        alert('Motorista: Por favor, digite a Placa da sua moto antes de entrar com o Google.');
+        return;
+      }
+
+      if (plateInput) localStorage.setItem('sjn_plate', plateInput);
+      if (nameInput) localStorage.setItem('sjn_name', nameInput);
       localStorage.setItem('sjn_role', currentRole);
 
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
-        const result = await auth.signInWithPopup(provider);
-        const user = result.user;
-
-        if (currentRole === 'motorista') {
-          const userRef = db.ref('usuarios/' + user.uid);
-          const snap = await userRef.once('value');
-          const userData = snap.val();
-
-          if (userData && userData.placa) {
-            plateInput = userData.placa;
-          } else if (plateInput) {
-            await userRef.set({
-              nome: user.displayName || nameInput,
-              email: user.email,
-              placa: plateInput,
-              role: 'motorista'
-            });
-          } else {
-            alert('Motorista: Por favor, digite a Placa da sua moto para concluir o primeiro cadastro.');
-            return;
-          }
-
-          localStorage.setItem('sjn_plate', plateInput);
-        }
-
-        if (nameInput) localStorage.setItem('sjn_name', nameInput);
-
+        await auth.signInWithPopup(provider);
       } catch (error) {
         try {
           await auth.signInWithRedirect(provider);
@@ -613,14 +456,7 @@
       localStorage.setItem('sjn_role', currentRole);
 
       try {
-        const cred = await auth.signInAnonymously();
-        if (currentRole === 'motorista' && cred.user) {
-          db.ref('usuarios/' + cred.user.uid).set({
-            nome: name,
-            placa: plate,
-            role: 'motorista'
-          });
-        }
+        await auth.signInAnonymously();
         entrarNoAppComDados(name, phone, plate);
       } catch (error) {
         console.error("Erro no login anônimo:", error);
@@ -1039,7 +875,7 @@
           if (pRouteLine) passengerMap.removeLayer(pRouteLine);
           
           pRouteLine = L.polyline(coordinates, { 
-            color: '#ffc107', 
+            color: '#007bff', 
             weight: 5,
             dashArray: '8, 8' 
           }).addTo(passengerMap);
@@ -1051,15 +887,13 @@
     }
 
     async function desenharRotaMotoristaAtePassageiroNoCliente(motoristaLat, motoristaLng) {
-      if (!passengerMap || !origem || !activeRideId) return;
+      if (!passengerMap || !origem) return;
 
       const url = `https://router.project-osrm.org/route/v1/driving/${motoristaLng},${motoristaLat};${origem[1]},${origem[0]}?overview=full&geometries=geojson`;
 
       try {
         const res = await fetch(url);
         const data = await res.json();
-
-        if (!activeRideId) return;
 
         if (data.routes && data.routes.length > 0) {
           const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
@@ -1099,8 +933,6 @@
       };
 
       newRideRef.set(rideData);
-
-      document.getElementById('destination-input').value = '';
 
       document.getElementById('ride-details').style.display = 'none';
       document.getElementById('status-box').style.display = 'block';
@@ -1180,8 +1012,6 @@
       activeRideId = null;
       destino = null;
 
-      document.getElementById('destination-input').value = '';
-
       const statusBox = document.getElementById('status-box');
       statusBox.style.display = 'none';
       statusBox.innerText = '';
@@ -1193,26 +1023,23 @@
     function escutarCorridasMotorista() {
       db.ref('corridas').on('value', (snapshot) => {
         if (isDriverBlocked) return;
-        
-        if (activeRideId !== null) return;
-        
         const data = snapshot.val();
-        let corridaEncontrada = null;
         
+        let corridaEncontrada = null;
         if (data) {
           Object.keys(data).forEach(key => {
-            if (data[key].status === 'solicitada') {
+            if (data[key].status === 'solicitada' && !activeRideId) {
               corridaEncontrada = data[key];
             }
           });
         }
 
-        if (corridaEncontrada) {
+        if (corridaEncontrada && !activeRideId) {
           pendingRide = corridaEncontrada;
           currentRideStatus = 'solicitada';
           const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
           
-          document.getElementById('driver-empty-box').style.display = 'none';
+          document.getElementById('driver-empty-box').style.display = 'block';
           document.getElementById('driver-request-card').style.display = 'block';
           document.getElementById('driver-pickup-card').style.display = 'none';
           document.getElementById('driver-active-card').style.display = 'none';
@@ -1227,7 +1054,7 @@
             alertarMotoristaComSom();
           }
 
-        } else {
+        } else if (!activeRideId && !corridaEncontrada) {
           pendingRide = null;
           currentRideStatus = null;
           lastNotifiedRideId = null;
@@ -1391,7 +1218,8 @@
         return (currentBalance || 0) + 1.00;
       });
 
-      const idCorridaEncerrada = activeRideId;
+      const rideRef = db.ref('corridas/' + activeRideId);
+      rideRef.remove();
 
       activeRideId = null;
       pendingRide = null;
@@ -1407,11 +1235,7 @@
         document.getElementById('driver-empty-box').style.display = 'block';
       }
 
-      db.ref('corridas/' + idCorridaEncerrada).remove();
-
       alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}\n📝 Taxa de R$ 1,00 adicionada ao seu saldo devedor.`);
-
-      db.ref('corridas').once('value');
     }
 
     function sairDaConta() {
