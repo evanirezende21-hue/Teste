@@ -4,44 +4,150 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Moto Táxi SJN - Firebase</title>
-  <link rel="stylesheet" href="./assets/css/base.css" />
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet Rotate CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.css" />
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     html, body { height: 100%; width: 100%; overflow: hidden; background: #212121; }
+    
     .screen { display: none; height: 100%; width: 100%; position: relative; }
     .screen.active { display: flex; flex-direction: column; }
+
     #auth-screen { background: #111; color: #fff; justify-content: center; align-items: center; padding: 20px; text-align: center; }
     .auth-card { background: #222; padding: 24px; border-radius: 16px; width: 100%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid #333; }
     .auth-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
     .tab-btn { flex: 1; padding: 10px 4px; border: none; background: #333; color: #888; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; }
     .tab-btn.active { background: #ffc107; color: #000; }
+
     .form-group { text-align: left; margin-bottom: 14px; }
     .form-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 6px; }
     .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #333; color: #fff; font-size: 14px; outline: none; }
     .form-group input:focus { border-color: #ffc107; }
-    header { position: absolute; top: 0; left: 0; right: 0; background: rgba(33, 33, 33, 0.95); color: #ffc107; padding: 12px 16px; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; backdrop-filter: blur(5px); }
+
+    header { 
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      right: 0; 
+      background: rgba(33, 33, 33, 0.95); 
+      color: #ffc107; 
+      padding: 12px 16px; 
+      font-weight: bold; 
+      font-size: 15px; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3); 
+      z-index: 1000; 
+      backdrop-filter: blur(5px);
+    }
     header .user-badge { font-size: 12px; background: rgba(255,255,255,0.1); color: #fff; padding: 4px 8px; border-radius: 12px; margin-top: 2px; }
     header button { background: #ffc107; color: #000; border: none; padding: 8px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; }
-    .map-container { position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; z-index: 1; background: #e5e3df; }
+
+    .map-container { 
+      position: absolute; 
+      top: 0; 
+      bottom: 0; 
+      left: 0; 
+      right: 0; 
+      width: 100%; 
+      height: 100%; 
+      z-index: 1; 
+      background: #e5e3df;
+    }
+
     .bottom-card { position: absolute; bottom: 20px; left: 16px; right: 16px; background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); z-index: 1000; }
     .price-tag { font-size: 26px; font-weight: bold; color: #2e7d32; }
     .info-text { font-size: 14px; color: #555; margin-bottom: 8px; }
-    .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
-    .search-input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #ccc; font-size: 14px; outline: none; }
-    .btn-mic { background: #2196f3; color: white; border: none; padding: 0 14px; border-radius: 10px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .btn-mic.listening { background: #f44336; animation: pulse 1s infinite; }
-    .btn-search { background: #ffc107; color: black; border: none; padding: 0 14px; border-radius: 10px; font-weight: bold; cursor: pointer; }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
-    .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+
+    /* ESTILOS DA PESQUISA POR VOZ E TEXTO */
+    .search-box {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .search-input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      outline: none;
+    }
+    .btn-mic {
+      background: #2196f3;
+      color: white;
+      border: none;
+      padding: 0 14px;
+      border-radius: 10px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-mic.listening {
+      background: #f44336;
+      animation: pulse 1s infinite;
+    }
+    .btn-search {
+      background: #ffc107;
+      color: black;
+      border: none;
+      padding: 0 14px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    .btn-primary { width: 100%; background: #ffc107; color: #000; border: none; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
     .btn-success { background: #27ae60; color: #fff; }
-    .btn-google { width: 100%; background: #ffffff; color: #333333; border: 1px solid #cccccc; padding: 12px; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+    .btn-google {
+      width: 100%;
+      background: #ffffff;
+      color: #333333;
+      border: 1px solid #cccccc;
+      padding: 12px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
     .btn-google:hover { background: #f5f5f5; }
+
     .leaflet-top { top: 60px !important; }
-    .custom-label { background: #222; color: #fff; border: 1px solid #ffc107; border-radius: 6px; padding: 3px 7px; font-size: 11px; font-weight: bold; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+
+    .custom-label {
+      background: #222;
+      color: #fff;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 3px 7px;
+      font-size: 11px;
+      font-weight: bold;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
     .leaflet-tooltip-bottom.custom-label::before { border-bottom-color: #222; }
+
+    /* ESTILOS PAINEL ADMIN */
     #admin-screen { background: #181818; color: #fff; padding: 70px 16px 20px 16px; overflow-y: auto; }
     .admin-card { background: #282828; border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid #3d3d3d; display: flex; flex-direction: column; gap: 8px; }
     .admin-card-header { display: flex; justify-content: space-between; align-items: center; }
@@ -54,132 +160,1287 @@
   </style>
 </head>
 <body>
+
+  <!-- LOGIN / CADASTRO -->
   <div id="auth-screen" class="screen active">
     <div class="auth-card">
       <h2 style="color: #ffc107; margin-bottom: 16px;">Moto Táxi SJN</h2>
+      
       <div class="auth-tabs">
-        <button class="tab-btn active" id="tab-passenger" data-role="passageiro">Passageiro</button>
-        <button class="tab-btn" id="tab-driver" data-role="motorista">Motorista</button>
-        <button class="tab-btn" id="tab-admin" data-role="admin">Admin</button>
+        <button class="tab-btn active" id="tab-passenger" onclick="setRole('passageiro')">Passageiro</button>
+        <button class="tab-btn" id="tab-driver" onclick="setRole('motorista')">Motorista</button>
+        <button class="tab-btn" id="tab-admin" onclick="setRole('admin')">Admin</button>
       </div>
+
       <div id="google-btn-container">
-        <button class="btn-google" id="btn-google-login">
-          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18L12.12 13.6C11.36 14.17 10.29 14.5 9 14.5 5.77 14.5 3.08 12.34 2.12 9.45H0V11.8C1.53 15.8 5.12 18 9 18z"/><path fill="#FBBC05" d="M2.12 9.45A5.62 5.62 0 0 1 1.95 7.5c0-.9.18-1.76.45-2.57L0 2.7A8.4 8.4 0 0 0 0 7.5c0 1.34.33 2.6.9 3.72l1.22-1.77z"/><path fill="#EA4335" d="M9 3.5c1.39 0 2.63.48 3.61 1.41l2.7-2.7C13.46.89 11.43 0 9 0A8.99 8.99 0 0 0 0 7.5L2.4 9.6C3.36 6.94 5.9 3.5 9 3.5z"/></svg>
+        <button class="btn-google" onclick="entrarComGoogle()">
+          <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.76.53-1.78.9-3.12.9-2.38 0-4.41-1.57-5.13-3.72L.98 13.01C2.47 15.97 5.49 18 9 18z"/><path fill="#FBBC05" d="M3.87 10.8c-.19-.53-.3-1.1-.3-1.8s.11-1.27.3-1.8L.98 4.99C.35 6.24 0 7.65 0 9s.35 2.76.98 4.01l2.89-2.21z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.49 0 2.47 2.03.98 4.99l2.89 2.21C4.59 5.05 6.62 3.58 9 3.58z"/></svg>
           ENTRAR COM O GOOGLE
         </button>
+
         <div style="color: #666; font-size: 12px; margin-bottom: 16px;">— OU USE O CADASTRO MANUAL —</div>
       </div>
+
       <div id="form-container">
         <div class="form-group" id="group-name">
           <label>Seu Nome Completo</label>
           <input type="text" id="user-name" placeholder="Ex: João Silva" />
         </div>
+
         <div class="form-group" id="group-phone">
           <label>Telemóvel / WhatsApp</label>
           <input type="tel" id="user-phone" placeholder="Ex: (32) 99999-9999" />
         </div>
+
         <div class="form-group" id="group-plate" style="display: none;">
           <label>Placa da Moto</label>
           <input type="text" id="user-plate" placeholder="Ex: ABC-1234" />
         </div>
+
         <div class="form-group" id="group-admin-pass" style="display: none;">
           <label>Senha de Administrador</label>
           <input type="password" id="admin-password" placeholder="Digite a senha admin" />
         </div>
-        <button class="btn-primary" id="btn-login">ENTRAR NO APP</button>
+
+        <button class="btn-primary" id="btn-login" onclick="entrarNoAppManual()">ENTRAR NO APP</button>
       </div>
     </div>
   </div>
 
+  <!-- PASSAGEIRO -->
   <div id="passenger-screen" class="screen">
     <header style="background: rgba(255,193,7,0.95); color: #000;">
       <div>
         <span>Passageiro</span>
         <div class="user-badge" id="passenger-badge" style="background: rgba(0,0,0,0.15); color: #000;">Nome</div>
       </div>
-      <button id="btn-passenger-logout" style="background: #000; color: #ffc107;">Sair / Trocar Perfil</button>
+      <button onclick="sairDaConta()" style="background: #000; color: #ffc107;">Sair / Trocar Perfil</button>
     </header>
+
     <div id="passenger-map" class="map-container"></div>
+
     <div class="bottom-card">
+      <!-- CAMPO DE PESQUISA POR VOZ E TEXTO -->
       <div class="search-box">
         <input type="text" id="destination-input" class="search-input" placeholder="Fale ou digite o endereço..." />
-        <button class="btn-mic" id="btn-voice" title="Falar Endereço">🎙️</button>
-        <button class="btn-search" id="btn-search-address">Buscar</button>
+        <button class="btn-mic" id="btn-voice" onclick="iniciarReconhecimentoVoz()" title="Falar Endereço">🎙️</button>
+        <button class="btn-search" onclick="buscarEndereçoPorTexto()">Buscar</button>
       </div>
+
       <div class="info-text" id="instruction-text">👉 Ou toque no mapa para marcar o destino.</div>
       <div id="status-box" style="display: none; font-size: 15px; font-weight: bold; color: #d35400; margin-bottom: 10px;"></div>
+      
       <div id="ride-details" style="display: none;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
             <div class="info-text" id="distance-text">Distância: 0.0 km</div>
             <div class="price-tag" id="price-text">R$ 0,00</div>
           </div>
-          <button class="btn-primary" id="btn-request" style="width: auto; padding: 12px 20px;">Chamar Moto</button>
+          <button class="btn-primary" id="btn-request" onclick="solicitarCorrida()" style="width: auto; padding: 12px 20px;">Chamar Moto</button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- MOTORISTA -->
   <div id="driver-screen" class="screen">
     <header>
       <div>
         <span>Painel do Motorista</span>
         <div class="user-badge" id="driver-badge">Nome (Placa)</div>
       </div>
-      <button id="btn-driver-logout">Sair / Trocar Perfil</button>
+      <button onclick="sairDaConta()">Sair / Trocar Perfil</button>
     </header>
+
     <div id="driver-map" class="map-container"></div>
-    <div id="driver-empty-box" class="bottom-card" style="text-align: center; color: #666; font-weight: bold;">🔎 Aguardando solicitações de corrida...</div>
+
+    <div id="driver-empty-box" class="bottom-card" style="text-align: center; color: #666; font-weight: bold;">
+      🔎 Aguardando solicitações de corrida...
+    </div>
+
+    <!-- CARD BLOQUEADO -->
     <div class="bottom-card" id="driver-blocked-card" style="display: none; text-align: center; background: #ffebee; border: 1px solid #c62828;">
       <div style="color: #c62828; font-weight: bold; font-size: 16px; margin-bottom: 6px;">🚫 Acesso Suspenso</div>
       <div class="info-text" id="driver-blocked-text" style="color: #b71c1c;">Sua conta possui pendência financeira. Realize o Pix de taxa para regularizar.</div>
     </div>
+
+    <!-- CARD SOLICITAÇÃO -->
     <div class="bottom-card" id="driver-request-card" style="display: none;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <strong style="font-size: 16px; color: #333;">Nova Solicitação!</strong>
         <span class="price-tag" id="driver-ride-price">R$ 0,00</span>
       </div>
       <div class="info-text" id="driver-passenger-info"><b>Passageiro:</b> --</div>
-      <button class="btn-primary" id="btn-accept-ride">ACEITAR CORRIDA</button>
+      <button class="btn-primary" id="btn-accept-ride" onclick="confirmarAceiteCorrida()">ACEITAR CORRIDA</button>
     </div>
+
+    <!-- CARD CAMINHO EMBARQUE -->
     <div class="bottom-card" id="driver-pickup-card" style="display: none;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
         <div style="color: #d35400; font-weight: bold;">🛵 A caminho do Passageiro</div>
         <span class="price-tag" id="driver-pickup-ride-price" style="font-size: 20px;">R$ 0,00</span>
       </div>
       <div class="info-text" id="driver-pickup-passenger-info"><b>Passageiro:</b> --</div>
-      <button class="btn-primary btn-success" id="btn-start-ride">INICIAR VIAGEM (PASSAGEIRO EMBARCOU)</button>
+      <button class="btn-primary btn-success" id="btn-start-ride" onclick="iniciarViagemComPassageiro()">INICIAR VIAGEM (PASSAGEIRO EMBARCOU)</button>
     </div>
+
+    <!-- CARD EM ANDAMENTO -->
     <div class="bottom-card" id="driver-active-card" style="display: none;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
         <div style="color: #27ae60; font-weight: bold;">✅ Viagem em Andamento</div>
         <span class="price-tag" id="driver-active-ride-price" style="font-size: 20px;">R$ 0,00</span>
       </div>
       <div class="info-text" id="driver-active-passenger-info"><b>Passageiro:</b> --</div>
-      <button class="btn-primary" id="btn-finish-ride">CONCLUIR CORRIDA (R$ 1,00 Taxa)</button>
+      <button class="btn-primary" id="btn-finish-ride" onclick="finalizarCorrida()">CONCLUIR CORRIDA (R$ 1,00 Taxa)</button>
     </div>
   </div>
 
+  <!-- PAINEL ADMIN -->
   <div id="admin-screen" class="screen">
     <header style="background: #111; color: #ffc107;">
       <div>
         <span>Painel do Administrador</span>
         <div class="user-badge" style="color: #aaa;">Gestão de Taxas e Bloqueios</div>
       </div>
-      <button id="btn-admin-logout">Sair</button>
+      <button onclick="sairDaConta()">Sair</button>
     </header>
+
     <div style="margin-bottom: 16px;">
       <h3 style="color: #ffc107; font-size: 18px; margin-bottom: 4px;">Motoristas Cadastrados</h3>
       <p style="color: #aaa; font-size: 13px;">Gerencie o saldo de taxas e permissões dos motoristas.</p>
     </div>
-    <div id="admin-drivers-list"></div>
+
+    <div id="admin-drivers-list">
+      <!-- Lista preenchida em tempo real via JavaScript -->
+    </div>
   </div>
 
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet Rotate JS -->
   <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
+
+  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  <script type="module" src="./js/main.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCHZvFu6YPrrLB-ssTJ2gES_QaQASLVy9M",
+      authDomain: "moto-taxi-sjn-d9b71.firebaseapp.com",
+      databaseURL: "https://moto-taxi-sjn-d9b71-default-rtdb.firebaseio.com",
+      projectId: "moto-taxi-sjn-d9b71",
+      storageBucket: "moto-taxi-sjn-d9b71.appspot.com",
+      messagingSenderId: "13246123116",
+      appId: "1:13246123116:web:85941b49c4f5528ca05c49"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+    const ADMIN_PASSWORD_CORRETA = "Rinaverinave32@";
+
+    let currentRole = 'passageiro';
+    let currentUser = null;
+    let activeRideId = null;
+    let pendingRide = null;
+    let currentRideStatus = null;
+    let wakeLock = null;
+    let lastNotifiedRideId = null;
+    let activeDriverTrackingRef = null;
+    let driverStatusRef = null;
+    let isDriverBlocked = false;
+
+    let passengerMap, driverMap;
+    let pUserMarker, pDestMarker, pRouteLine, pDriverToPassengerLine;
+    let dSelfMarker, dOrigMarker, dDestMarker;
+    let dRouteLayerGroup = null;
+
+    let driverMarkers = {}; 
+    let passengerMarkers = {};
+    let otherDriverMarkers = {};
+
+    let origem = [-21.5431, -43.0108]; 
+    let driverPos = [-21.5431, -43.0108]; 
+    let destino = null;
+    let valorEstimado = 0;
+    let distanciaKm = 0;
+
+    const TAXA_MINIMA = 6.68;
+    const PRECO_POR_KM = 2.50;
+
+    const greenIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+    const blueIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+    const redIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+
+    const motoSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%23ffc107" stroke="%23000000" stroke-width="3"/><circle cx="20" cy="42" r="8" fill="%23222222"/><circle cx="44" cy="42" r="8" fill="%23222222"/><path d="M20 42 L26 26 L36 26 L42 34 L44 42" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 26 L32 18 L38 18" fill="none" stroke="%23222222" stroke-width="4" stroke-linecap="round"/></svg>`;
+
+    const motoIcon = L.icon({
+      iconUrl: motoSvg,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+      popupAnchor: [0, -18]
+    });
+
+    // --- RECONHECIMENTO DE VOZ E BUSCA LOCAL DE ENDEREÇO ---
+    function iniciarReconhecimentoVoz() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("O seu navegador não suporta reconhecimento de voz. Por favor, digite o endereço.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.interimResults = false;
+
+      const btnMic = document.getElementById('btn-voice');
+      btnMic.classList.add('listening');
+
+      recognition.start();
+
+      recognition.onresult = (event) => {
+        btnMic.classList.remove('listening');
+        const textoFalar = event.results[0][0].transcript;
+        document.getElementById('destination-input').value = textoFalar;
+        buscarEndereçoPorTexto(textoFalar);
+      };
+
+      recognition.onerror = (event) => {
+        btnMic.classList.remove('listening');
+        alert("Não foi possível entender a voz. Tente falar novamente ou digite.");
+      };
+
+      recognition.onend = () => {
+        btnMic.classList.remove('listening');
+      };
+    }
+
+    async function buscarEndereçoPorTexto(textoBusca) {
+      const rawQuery = textoBusca || document.getElementById('destination-input').value.trim();
+      if (!rawQuery) return;
+
+      let queryCompleta = rawQuery;
+      if (!rawQuery.toLowerCase().includes('são joão nepomuceno') && !rawQuery.toLowerCase().includes('sjn')) {
+        queryCompleta = `${rawQuery}, São João Nepomuceno - MG`;
+      }
+
+      try {
+        const viewbox = "-43.05,-21.50,-42.97,-21.58";
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryCompleta)}&bounded=1&viewbox=${viewbox}&limit=1`;
+        
+        let res = await fetch(url);
+        let data = await res.json();
+
+        if (!data || data.length === 0) {
+          const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryCompleta)}&limit=1`;
+          res = await fetch(fallbackUrl);
+          data = await res.json();
+        }
+
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          
+          onPassengerMapClick({ latlng: { lat, lng: lon } });
+        } else {
+          alert("Endereço não encontrado em São João Nepomuceno. Tente indicar mais detalhes da rua ou ponto de referência.");
+        }
+      } catch (e) {
+        console.error("Erro na busca de endereço:", e);
+        alert("Erro ao pesquisar o endereço.");
+      }
+    }
+
+    function alertarMotoristaComSom() {
+      if (isDriverBlocked) return;
+      if ('vibrate' in navigator) {
+        navigator.vibrate([300, 150, 300, 150, 300]);
+      }
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 1.2);
+      } catch (e) {
+        console.log("Erro áudio:", e);
+      }
+    }
+
+    async function manterTelaAcesa() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.log("Erro no WakeLock:", err.message);
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && currentRole === 'motorista') {
+        manterTelaAcesa();
+      }
+    });
+
+    function setRole(newRole) {
+      currentRole = newRole;
+      localStorage.setItem('sjn_role', newRole);
+      document.getElementById('tab-passenger').classList.toggle('active', newRole === 'passageiro');
+      document.getElementById('tab-driver').classList.toggle('active', newRole === 'motorista');
+      document.getElementById('tab-admin').classList.toggle('active', newRole === 'admin');
+
+      document.getElementById('group-name').style.display = newRole === 'admin' ? 'none' : 'block';
+      document.getElementById('group-phone').style.display = newRole === 'passageiro' ? 'block' : 'none';
+      document.getElementById('group-plate').style.display = newRole === 'motorista' ? 'block' : 'none';
+      document.getElementById('group-admin-pass').style.display = newRole === 'admin' ? 'block' : 'none';
+      document.getElementById('google-btn-container').style.display = newRole === 'admin' ? 'none' : 'block';
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const savedRole = localStorage.getItem('sjn_role') || currentRole || 'passageiro';
+        if (savedRole === 'admin') return;
+
+        let savedName = localStorage.getItem('sjn_name') || user.displayName || 'Usuário';
+        let savedPhone = localStorage.getItem('sjn_phone') || user.phoneNumber || user.email || 'Google User';
+        let savedPlate = localStorage.getItem('sjn_plate') || '';
+
+        if (savedRole === 'motorista' && user.uid) {
+          try {
+            const snap = await db.ref('usuarios/' + user.uid).once('value');
+            const userData = snap.val();
+            if (userData && userData.placa) {
+              savedPlate = userData.placa;
+              localStorage.setItem('sjn_plate', savedPlate);
+            }
+          } catch (e) {
+            console.error("Erro ao buscar dados do usuário:", e);
+          }
+        }
+
+        currentRole = savedRole;
+        if (currentRole === 'motorista' && !savedPlate) {
+          return;
+        }
+
+        entrarNoAppComDados(savedName, savedPhone, savedPlate);
+      }
+    });
+
+    async function entrarComGoogle() {
+      let plateInput = document.getElementById('user-plate').value.trim();
+      let nameInput = document.getElementById('user-name').value.trim();
+      localStorage.setItem('sjn_role', currentRole);
+
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+
+        if (currentRole === 'motorista') {
+          const userRef = db.ref('usuarios/' + user.uid);
+          const snap = await userRef.once('value');
+          const userData = snap.val();
+
+          if (userData && userData.placa) {
+            plateInput = userData.placa;
+          } else if (plateInput) {
+            await userRef.set({
+              nome: user.displayName || nameInput,
+              email: user.email,
+              placa: plateInput,
+              role: 'motorista'
+            });
+          } else {
+            alert('Motorista: Por favor, digite a Placa da sua moto para concluir o primeiro cadastro.');
+            return;
+          }
+
+          localStorage.setItem('sjn_plate', plateInput);
+        }
+
+        if (nameInput) localStorage.setItem('sjn_name', nameInput);
+
+      } catch (error) {
+        try {
+          await auth.signInWithRedirect(provider);
+        } catch (err) {
+          console.error("Erro no login Google:", err);
+          alert("Erro ao autenticar com o Google. Tente novamente.");
+        }
+      }
+    }
+
+    async function entrarNoAppManual() {
+      if (currentRole === 'admin') {
+        const pass = document.getElementById('admin-password').value.trim();
+        if (pass === ADMIN_PASSWORD_CORRETA) {
+          try {
+            await auth.signInAnonymously();
+            entrarPainelAdmin();
+          } catch (e) {
+            entrarPainelAdmin();
+          }
+        } else {
+          alert('Senha de Administrador incorreta!');
+        }
+        return;
+      }
+
+      const name = document.getElementById('user-name').value.trim();
+      const phone = document.getElementById('user-phone').value.trim();
+      const plate = document.getElementById('user-plate').value.trim();
+
+      if (!name || (currentRole === 'passageiro' && !phone) || (currentRole === 'motorista' && !plate)) {
+        alert('Por favor, preencha todos os campos.');
+        return;
+      }
+
+      localStorage.setItem('sjn_name', name);
+      localStorage.setItem('sjn_phone', phone);
+      localStorage.setItem('sjn_plate', plate);
+      localStorage.setItem('sjn_role', currentRole);
+
+      try {
+        const cred = await auth.signInAnonymously();
+        if (currentRole === 'motorista' && cred.user) {
+          db.ref('usuarios/' + cred.user.uid).set({
+            nome: name,
+            placa: plate,
+            role: 'motorista'
+          });
+        }
+        entrarNoAppComDados(name, phone, plate);
+      } catch (error) {
+        console.error("Erro no login anônimo:", error);
+        alert("Erro de autenticação no Firebase. Ative o login Anônimo na consola do Firebase.");
+      }
+    }
+
+    function entrarPainelAdmin() {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('admin-screen').classList.add('active');
+      carregarListaAdmin();
+    }
+
+    function carregarListaAdmin() {
+      db.ref('motoristas').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const container = document.getElementById('admin-drivers-list');
+        container.innerHTML = '';
+
+        const keys = Object.keys(data);
+        if (keys.length === 0) {
+          container.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">Nenhum motorista cadastrado ainda.</div>';
+          return;
+        }
+
+        keys.forEach(keyPlate => {
+          const m = data[keyPlate];
+          const saldo = (m.saldoDevedor || 0).toFixed(2).replace('.', ',');
+          const estaBloqueado = m.bloqueado === true;
+
+          const card = document.createElement('div');
+          card.className = 'admin-card';
+          card.innerHTML = `
+            <div class="admin-card-header">
+              <strong>${m.nome || 'Motorista'} (${m.placa || keyPlate})</strong>
+              <span style="font-size: 11px; padding: 3px 8px; border-radius: 10px; background: ${estaBloqueado ? '#c62828' : '#2e7d32'}; color: #fff;">
+                ${estaBloqueado ? 'SUSPENSO' : 'ATIVO'}
+              </span>
+            </div>
+            <div style="font-size: 14px; color: #ddd;">
+              Taxas Devidas: <strong style="color: ${m.saldoDevedor > 0 ? '#ff5252' : '#69f0ae'};">R$ ${saldo}</strong>
+            </div>
+            <div class="admin-actions">
+              <button class="admin-btn btn-quitar" onclick="quitarSaldoMotorista('${keyPlate}')">💵 Quitar (Pix OK)</button>
+              ${estaBloqueado 
+                ? `<button class="admin-btn btn-desbloquear" onclick="alternarBloqueioMotorista('${keyPlate}', false)">✅ Liberar</button>`
+                : `<button class="admin-btn btn-bloquear" onclick="alternarBloqueioMotorista('${keyPlate}', true)">🚫 Bloquear</button>`
+              }
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      });
+    }
+
+    function quitarSaldoMotorista(keyPlate) {
+      if (confirm(`Deseja dar baixa e zerar o saldo do motorista (${keyPlate})?`)) {
+        db.ref('motoristas/' + keyPlate).update({ saldoDevedor: 0 });
+      }
+    }
+
+    function alternarBloqueioMotorista(keyPlate, bloquear) {
+      const acao = bloquear ? 'bloquear/suspender' : 'liberar';
+      if (confirm(`Tem certeza que deseja ${acao} este motorista?`)) {
+        db.ref('motoristas/' + keyPlate).update({ bloqueado: bloquear });
+      }
+    }
+
+    function entrarNoAppComDados(name, phone, plate) {
+      currentUser = { name, phone, plate, role: currentRole };
+
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+
+      if (currentRole === 'passageiro') {
+        document.getElementById('passenger-badge').innerText = `${name} (${phone})`;
+        document.getElementById('passenger-screen').classList.add('active');
+        
+        setTimeout(() => {
+          initPassengerMap();
+          carregarEExibirMotoristasNoMapa();
+        }, 150);
+
+      } else if (currentRole === 'motorista') {
+        document.getElementById('driver-badge').innerText = `${name} - Placa: ${plate}`;
+        document.getElementById('driver-screen').classList.add('active');
+        
+        manterTelaAcesa();
+
+        setTimeout(() => {
+          initDriverMapBase();
+          salvarEAtivarGPSMotorista();
+          escutarStatusMotorista();
+          carregarEExibirPassageirosNoMapaMotorista();
+          carregarEExibirOutrosMotoristasNoMapaMotorista();
+          escutarCorridasMotorista();
+        }, 150);
+      }
+    }
+
+    function initPassengerMap() {
+      if (!passengerMap) {
+        passengerMap = L.map('passenger-map', { 
+          zoomControl: true,
+          rotate: true,
+          touchRotate: true,
+          rotateControl: false
+        }).setView(origem, 16);
+        
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: '&copy; Google Maps'
+        });
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: '&copy; Google Satellite'
+        });
+
+        googleSat.addTo(passengerMap);
+
+        L.control.layers({
+          "Satélite (Google)": googleSat,
+          "Mapa de Ruas (Google)": googleStreets
+        }, {}, { position: 'topright' }).addTo(passengerMap);
+        
+        pUserMarker = L.marker(origem, { icon: blueIcon })
+          .addTo(passengerMap)
+          .bindPopup(`<b>Sua Posição</b><br>${currentUser.name}`)
+          .bindTooltip(`👤 ${currentUser.name}`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+      }
+      
+      passengerMap.invalidateSize();
+
+      const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '') || Date.now();
+      const passengerRef = db.ref('passageiros/' + keyPhone);
+
+      passengerRef.onDisconnect().remove();
+
+      passengerRef.set({
+        nome: currentUser.name,
+        telefone: currentUser.phone,
+        lat: origem[0],
+        lng: origem[1],
+        updatedAt: Date.now()
+      });
+
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition((pos) => {
+          origem = [pos.coords.latitude, pos.coords.longitude];
+          if (pUserMarker) pUserMarker.setLatLng(origem);
+          
+          passengerRef.set({
+            nome: currentUser.name,
+            telefone: currentUser.phone,
+            lat: origem[0],
+            lng: origem[1],
+            updatedAt: Date.now()
+          });
+        }, null, { enableHighAccuracy: true });
+      }
+
+      passengerMap.off('click');
+      passengerMap.on('click', onPassengerMapClick);
+    }
+
+    function carregarEExibirMotoristasNoMapa() {
+      db.ref('motoristas').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        if (!passengerMap) return;
+
+        const agora = Date.now();
+        const CINCO_MINUTOS = 5 * 60 * 1000;
+
+        Object.keys(driverMarkers).forEach(placa => {
+          const m = data[placa];
+          const isOffline = !m || m.online === false || m.bloqueado === true || !m.updatedAt || (agora - m.updatedAt > CINCO_MINUTOS);
+
+          if (isOffline) {
+            passengerMap.removeLayer(driverMarkers[placa]);
+            delete driverMarkers[placa];
+          }
+        });
+
+        Object.keys(data).forEach(placa => {
+          const m = data[placa];
+          const isOnline = m && m.online !== false && m.bloqueado !== true && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
+
+          if (isOnline && m.lat && m.lng) {
+            if (driverMarkers[placa]) {
+              driverMarkers[placa].setLatLng([m.lat, m.lng]);
+            } else {
+              driverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
+                .addTo(passengerMap)
+                .bindPopup(`🏍️ <b>Piloto:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
+                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+            }
+          }
+        });
+      });
+    }
+
+    function initDriverMapBase() {
+      if (!driverMap) {
+        driverMap = L.map('driver-map', { 
+          zoomControl: true,
+          rotate: true,
+          touchRotate: true,
+          rotateControl: false
+        }).setView(driverPos, 16);
+        
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: '&copy; Google Maps'
+        });
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: '&copy; Google Satellite'
+        });
+
+        googleSat.addTo(driverMap);
+
+        L.control.layers({
+          "Satélite (Google)": googleSat,
+          "Mapa de Ruas (Google)": googleStreets
+        }, {}, { position: 'topright' }).addTo(driverMap);
+        
+        dSelfMarker = L.marker(driverPos, { icon: motoIcon })
+          .addTo(driverMap)
+          .bindPopup(`🏍️ <b>Sua Moto</b><br>${currentUser.name}`)
+          .bindTooltip(`🏍️ ${currentUser.name} (${currentUser.plate})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+        
+        dRouteLayerGroup = L.layerGroup().addTo(driverMap);
+      }
+      
+      driverMap.invalidateSize();
+    }
+
+    function salvarEAtivarGPSMotorista() {
+      const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+      const driverRef = db.ref('motoristas/' + keyPlate);
+
+      driverRef.onDisconnect().update({ online: false });
+
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition((pos) => {
+          driverPos = [pos.coords.latitude, pos.coords.longitude];
+          
+          if (dSelfMarker) dSelfMarker.setLatLng(driverPos);
+          if (driverMap) {
+            driverMap.invalidateSize();
+            driverMap.panTo(driverPos);
+
+            if (pos.coords.heading !== null && pos.coords.heading !== undefined && !isNaN(pos.coords.heading)) {
+              driverMap.setBearing(-pos.coords.heading);
+            }
+          }
+
+          driverRef.update({
+            nome: currentUser.name,
+            placa: currentUser.plate,
+            lat: driverPos[0],
+            lng: driverPos[1],
+            heading: pos.coords.heading || 0,
+            online: true,
+            updatedAt: Date.now()
+          });
+
+          if ((activeRideId || pendingRide) && currentRideStatus) {
+            const ride = pendingRide;
+            if (ride) {
+              exibirSolicitacaoNoMapaMotorista([ride.origem_lat, ride.origem_lng], [ride.destino_lat, ride.destino_lng], false);
+            }
+          }
+        }, null, { enableHighAccuracy: true });
+      }
+    }
+
+    function escutarStatusMotorista() {
+      const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+      driverStatusRef = db.ref('motoristas/' + keyPlate);
+
+      driverStatusRef.on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const saldoDevedor = data.saldoDevedor || 0;
+        isDriverBlocked = data.bloqueado === true;
+
+        const badge = document.getElementById('driver-badge');
+        badge.innerHTML = `${currentUser.name} (${currentUser.plate}) <br><span style="color: ${saldoDevedor > 0 ? '#ff5252' : '#69f0ae'}; font-weight:bold;">Taxas Devidas: R$ ${saldoDevedor.toFixed(2).replace('.', ',')}</span>`;
+
+        if (isDriverBlocked) {
+          document.getElementById('driver-blocked-card').style.display = 'block';
+          document.getElementById('driver-empty-box').style.display = 'none';
+          document.getElementById('driver-request-card').style.display = 'none';
+          document.getElementById('driver-pickup-card').style.display = 'none';
+          document.getElementById('driver-active-card').style.display = 'none';
+        } else {
+          document.getElementById('driver-blocked-card').style.display = 'none';
+          if (!activeRideId && !pendingRide) {
+            document.getElementById('driver-empty-box').style.display = 'block';
+          }
+        }
+      });
+    }
+
+    function carregarEExibirPassageirosNoMapaMotorista() {
+      db.ref('passageiros').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        if (!driverMap) return;
+
+        const agora = Date.now();
+        const CINCO_MINUTOS = 5 * 60 * 1000;
+
+        Object.keys(passengerMarkers).forEach(key => {
+          const p = data[key];
+          const isOffline = !p || !p.updatedAt || (agora - p.updatedAt > CINCO_MINUTOS);
+
+          if (isOffline) {
+            driverMap.removeLayer(passengerMarkers[key]);
+            delete passengerMarkers[key];
+          }
+        });
+
+        Object.keys(data).forEach(key => {
+          const p = data[key];
+          const isOnline = p && p.updatedAt && (agora - p.updatedAt <= CINCO_MINUTOS);
+
+          if (isOnline && p.lat && p.lng) {
+            if (passengerMarkers[key]) {
+              passengerMarkers[key].setLatLng([p.lat, p.lng]);
+            } else {
+              passengerMarkers[key] = L.marker([p.lat, p.lng], { icon: blueIcon })
+                .addTo(driverMap)
+                .bindPopup(`👤 <b>Passageiro:</b><br>${p.nome}<br>📞 ${p.telefone}`)
+                .bindTooltip(`👤 ${p.nome}`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+            }
+          }
+        });
+      });
+    }
+
+    function carregarEExibirOutrosMotoristasNoMapaMotorista() {
+      db.ref('motoristas').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        if (!driverMap) return;
+
+        const minhaPlacaKey = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+        const agora = Date.now();
+        const CINCO_MINUTOS = 5 * 60 * 1000;
+
+        Object.keys(otherDriverMarkers).forEach(placa => {
+          const m = data[placa];
+          const isOffline = !m || m.online === false || m.bloqueado === true || m.updatedAt && (agora - m.updatedAt > CINCO_MINUTOS);
+
+          if (isOffline || placa === minhaPlacaKey) {
+            driverMap.removeLayer(otherDriverMarkers[placa]);
+            delete otherDriverMarkers[placa];
+          }
+        });
+
+        Object.keys(data).forEach(placa => {
+          if (placa === minhaPlacaKey) return;
+
+          const m = data[placa];
+          const isOnline = m && m.online !== false && m.bloqueado !== true && m.updatedAt && (agora - m.updatedAt <= CINCO_MINUTOS);
+
+          if (isOnline && m.lat && m.lng) {
+            if (otherDriverMarkers[placa]) {
+              otherDriverMarkers[placa].setLatLng([m.lat, m.lng]);
+            } else {
+              otherDriverMarkers[placa] = L.marker([m.lat, m.lng], { icon: motoIcon })
+                .addTo(driverMap)
+                .bindPopup(`🏍️ <b>Colega:</b> ${m.nome}<br><b>Placa:</b> ${m.placa}`)
+                .bindTooltip(`🏍️ ${m.nome} (${m.placa})`, { permanent: true, direction: 'bottom', className: 'custom-label' });
+            }
+          }
+        });
+      });
+    }
+
+    async function onPassengerMapClick(e) {
+      if (activeRideId) return;
+      destino = [e.latlng.lat, e.latlng.lng];
+
+      if (pDestMarker) {
+        pDestMarker.setLatLng(destino);
+      } else {
+        pDestMarker = L.marker(destino, { icon: redIcon }).addTo(passengerMap);
+      }
+
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${origem[1]},${origem[0]};${destino[1]},${destino[0]}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.routes && data.routes.length > 0) {
+          distanciaKm = data.routes[0].distance / 1000;
+          
+          let valorBruto = TAXA_MINIMA + (distanciaKm * PRECO_POR_KM);
+          valorEstimado = Math.round(valorBruto);
+
+          if (valorEstimado < TAXA_MINIMA) {
+            valorEstimado = TAXA_MINIMA;
+          }
+
+          document.getElementById('instruction-text').style.display = 'none';
+          document.getElementById('ride-details').style.display = 'block';
+          document.getElementById('distance-text').innerText = `Distância: ${distanciaKm.toFixed(2)} km`;
+          document.getElementById('price-text').innerText = `R$ ${valorEstimado.toFixed(2).replace('.', ',')}`;
+
+          const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          if (pRouteLine) passengerMap.removeLayer(pRouteLine);
+          
+          pRouteLine = L.polyline(coordinates, { 
+            color: '#ffc107', 
+            weight: 5,
+            dashArray: '8, 8' 
+          }).addTo(passengerMap);
+          passengerMap.fitBounds(pRouteLine.getBounds(), { padding: [40, 40] });
+        }
+      } catch (error) {
+        console.error("Erro ao traçar rota:", error);
+      }
+    }
+
+    async function desenharRotaMotoristaAtePassageiroNoCliente(motoristaLat, motoristaLng) {
+      if (!passengerMap || !origem || !activeRideId) return;
+
+      const url = `https://router.project-osrm.org/route/v1/driving/${motoristaLng},${motoristaLat};${origem[1]},${origem[0]}?overview=full&geometries=geojson`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!activeRideId) return;
+
+        if (data.routes && data.routes.length > 0) {
+          const coordinates = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          
+          if (pDriverToPassengerLine) {
+            passengerMap.removeLayer(pDriverToPassengerLine);
+          }
+
+          pDriverToPassengerLine = L.polyline(coordinates, { 
+            color: '#00e676', 
+            weight: 6,
+            dashArray: '6, 6',
+            opacity: 0.95 
+          }).addTo(passengerMap);
+        }
+      } catch (e) {
+        console.error("Erro Rota Cliente-Motorista:", e);
+      }
+    }
+
+    function solicitarCorrida() {
+      const newRideRef = db.ref('corridas').push();
+      activeRideId = newRideRef.key;
+
+      const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '') || Date.now();
+
+      const rideData = {
+        id: activeRideId,
+        passageiroKey: keyPhone,
+        origem_endereco: `${currentUser.name} (${currentUser.phone})`,
+        origem_lat: origem[0],
+        origem_lng: origem[1],
+        destino_lat: destino[0],
+        destino_lng: destino[1],
+        valor: parseFloat(valorEstimado.toFixed(2)),
+        status: 'solicitada'
+      };
+
+      newRideRef.set(rideData);
+
+      document.getElementById('destination-input').value = '';
+
+      document.getElementById('ride-details').style.display = 'none';
+      document.getElementById('status-box').style.display = 'block';
+      document.getElementById('status-box').style.color = '#d35400';
+      document.getElementById('status-box').innerText = `⏳ Aguardando motorista aceitar... (Valor: R$ ${valorEstimado.toFixed(2).replace('.', ',')})`;
+
+      db.ref('corridas/' + activeRideId).on('value', (snapshot) => {
+        const corrida = snapshot.val();
+        
+        if (!corrida || corrida.status === 'concluida') {
+          db.ref('corridas/' + activeRideId).off();
+          resetarEstadoPassageiro();
+          return;
+        }
+
+        const valorFormatado = (corrida.valor || valorEstimado || 0).toFixed(2).replace('.', ',');
+
+        if (corrida.status === 'aceita') {
+          const box = document.getElementById('status-box');
+          const nomeMotorista = corrida.motoristaNome || 'O motorista';
+          const placaMotorista = corrida.motoristaPlaca ? ` (Placa: ${corrida.motoristaPlaca})` : '';
+
+          box.innerText = `🛵 ${nomeMotorista}${placaMotorista} aceitou a corrida e está a caminho do seu local! (Valor: R$ ${valorFormatado})`;
+          box.style.color = '#d35400';
+
+          if (corrida.motoristaPlaca) {
+            const keyPlate = corrida.motoristaPlaca.replace(/[^a-zA-Z0-9]/g, '');
+            
+            if (activeDriverTrackingRef) {
+              activeDriverTrackingRef.off();
+            }
+
+            activeDriverTrackingRef = db.ref('motoristas/' + keyPlate);
+            activeDriverTrackingRef.on('value', (mSnap) => {
+              const mData = mSnap.val();
+              if (mData && mData.lat && mData.lng) {
+                desenharRotaMotoristaAtePassageiroNoCliente(mData.lat, mData.lng);
+              }
+            });
+          }
+
+        } else if (corrida.status === 'em_andamento') {
+          const box = document.getElementById('status-box');
+          const nomeMotorista = corrida.motoristaNome || 'O motorista';
+          
+          if (pDriverToPassengerLine) {
+            passengerMap.removeLayer(pDriverToPassengerLine);
+            pDriverToPassengerLine = null;
+          }
+
+          box.innerText = `✅ Viagem em andamento com ${nomeMotorista}! A caminho do destino. (Valor: R$ ${valorFormatado})`;
+          box.style.color = '#27ae60';
+        }
+      });
+    }
+
+    function resetarEstadoPassageiro() {
+      if (activeDriverTrackingRef) {
+        activeDriverTrackingRef.off();
+        activeDriverTrackingRef = null;
+      }
+
+      if (pDriverToPassengerLine) { 
+        passengerMap.removeLayer(pDriverToPassengerLine); 
+        pDriverToPassengerLine = null; 
+      }
+
+      if (pDestMarker) { 
+        passengerMap.removeLayer(pDestMarker); 
+        pDestMarker = null; 
+      }
+      if (pRouteLine) { 
+        passengerMap.removeLayer(pRouteLine); 
+        pRouteLine = null; 
+      }
+
+      activeRideId = null;
+      destino = null;
+
+      document.getElementById('destination-input').value = '';
+
+      const statusBox = document.getElementById('status-box');
+      statusBox.style.display = 'none';
+      statusBox.innerText = '';
+
+      document.getElementById('instruction-text').style.display = 'block';
+      document.getElementById('ride-details').style.display = 'none';
+    }
+
+    function escutarCorridasMotorista() {
+      db.ref('corridas').on('value', (snapshot) => {
+        if (isDriverBlocked) return;
+        
+        if (activeRideId !== null) return;
+        
+        const data = snapshot.val();
+        let corridaEncontrada = null;
+        
+        if (data) {
+          Object.keys(data).forEach(key => {
+            if (data[key].status === 'solicitada') {
+              corridaEncontrada = data[key];
+            }
+          });
+        }
+
+        if (corridaEncontrada) {
+          pendingRide = corridaEncontrada;
+          currentRideStatus = 'solicitada';
+          const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
+          
+          document.getElementById('driver-empty-box').style.display = 'none';
+          document.getElementById('driver-request-card').style.display = 'block';
+          document.getElementById('driver-pickup-card').style.display = 'none';
+          document.getElementById('driver-active-card').style.display = 'none';
+
+          document.getElementById('driver-ride-price').innerText = `R$ ${valorFormatado}`;
+          document.getElementById('driver-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
+
+          exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng], true);
+
+          if (lastNotifiedRideId !== pendingRide.id) {
+            lastNotifiedRideId = pendingRide.id;
+            alertarMotoristaComSom();
+          }
+
+        } else {
+          pendingRide = null;
+          currentRideStatus = null;
+          lastNotifiedRideId = null;
+          limparRotasMapaMotorista();
+          document.getElementById('driver-empty-box').style.display = 'block';
+          document.getElementById('driver-request-card').style.display = 'none';
+          document.getElementById('driver-pickup-card').style.display = 'none';
+          document.getElementById('driver-active-card').style.display = 'none';
+        }
+      });
+    }
+
+    function limparRotasMapaMotorista() {
+      if (dOrigMarker) { driverMap.removeLayer(dOrigMarker); dOrigMarker = null; }
+      if (dDestMarker) { driverMap.removeLayer(dDestMarker); dDestMarker = null; }
+      if (dRouteLayerGroup) { dRouteLayerGroup.clearLayers(); }
+    }
+
+    async function exibirSolicitacaoNoMapaMotorista(pOrigemPassageiro, pDestinoPassageiro, ajustarZoom = false) {
+      limparRotasMapaMotorista();
+
+      const urlAtePassageiro = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pOrigemPassageiro[1]},${pOrigemPassageiro[0]}?overview=full&geometries=geojson`;
+      const urlAteDestino = `https://router.project-osrm.org/route/v1/driving/${pOrigemPassageiro[1]},${pOrigemPassageiro[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
+
+      try {
+        if (currentRideStatus === 'aceita') {
+          dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
+            .addTo(driverMap)
+            .bindPopup("<b>Embarque Passageiro</b>")
+            .bindTooltip("🟢 Embarque", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
+          const res1 = await fetch(urlAtePassageiro);
+          const data1 = await res1.json();
+
+          if (dRouteLayerGroup && data1.routes && data1.routes.length > 0) {
+            const coordsAtePassageiro = data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            L.polyline(coordsAtePassageiro, { 
+              color: '#00e676', 
+              weight: 6,
+              dashArray: '6, 6',
+              opacity: 0.95 
+            }).addTo(dRouteLayerGroup);
+          }
+
+        } else if (currentRideStatus === 'em_andamento') {
+          dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon })
+            .addTo(driverMap)
+            .bindPopup("<b>Destino Final</b>")
+            .bindTooltip("🔴 Destino", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
+          const urlMotoAteDestino = `https://router.project-osrm.org/route/v1/driving/${driverPos[1]},${driverPos[0]};${pDestinoPassageiro[1]},${pDestinoPassageiro[0]}?overview=full&geometries=geojson`;
+          const res3 = await fetch(urlMotoAteDestino);
+          const data3 = await res3.json();
+
+          if (dRouteLayerGroup && data3.routes && data3.routes.length > 0) {
+            const coordsMotoAteDestino = data3.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            L.polyline(coordsMotoAteDestino, { 
+              color: '#2980b9', 
+              weight: 6,
+              dashArray: '8, 8',
+              opacity: 0.9 
+            }).addTo(dRouteLayerGroup);
+          }
+
+        } else if (currentRideStatus === 'solicitada') {
+          dOrigMarker = L.marker(pOrigemPassageiro, { icon: greenIcon })
+            .addTo(driverMap)
+            .bindPopup("<b>Embarque Passageiro</b>")
+            .bindTooltip("🟢 Embarque", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
+          dDestMarker = L.marker(pDestinoPassageiro, { icon: redIcon })
+            .addTo(driverMap)
+            .bindPopup("<b>Destino Final</b>")
+            .bindTooltip("🔴 Destino", { permanent: true, direction: 'bottom', className: 'custom-label' });
+
+          const [res1, res2] = await Promise.all([fetch(urlAtePassageiro), fetch(urlAteDestino)]);
+          const data1 = await res1.json();
+          const data2 = await res2.json();
+
+          if (dRouteLayerGroup) {
+            if (data1.routes && data1.routes.length > 0) {
+              const coordsAtePassageiro = data1.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+              L.polyline(coordsAtePassageiro, { 
+                color: '#00e676', 
+                weight: 6,
+                dashArray: '6, 6',
+                opacity: 0.95 
+              }).addTo(dRouteLayerGroup);
+            }
+
+            if (data2.routes && data2.routes.length > 0) {
+              const coordsAteDestino = data2.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+              L.polyline(coordsAteDestino, { 
+                color: '#2980b9', 
+                weight: 6,
+                dashArray: '10, 10',
+                opacity: 0.85 
+              }).addTo(dRouteLayerGroup);
+            }
+          }
+        }
+
+        if (ajustarZoom) {
+          const groupMarkers = [dSelfMarker];
+          if (dOrigMarker) groupMarkers.push(dOrigMarker);
+          if (dDestMarker) groupMarkers.push(dDestMarker);
+          driverMap.fitBounds(L.featureGroup(groupMarkers).getBounds(), { padding: [50, 50] });
+        }
+      } catch (e) {
+        console.error("Erro ao desenhar rotas do motorista:", e);
+      }
+    }
+
+    function confirmarAceiteCorrida() {
+      if (isDriverBlocked || !pendingRide) return;
+      activeRideId = pendingRide.id;
+      currentRideStatus = 'aceita';
+
+      manterTelaAcesa();
+
+      db.ref('corridas/' + activeRideId).update({ 
+        status: 'aceita',
+        motoristaNome: currentUser.name,
+        motoristaPlaca: currentUser.plate 
+      });
+
+      const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
+      document.getElementById('driver-request-card').style.display = 'none';
+      document.getElementById('driver-pickup-card').style.display = 'block';
+      document.getElementById('driver-active-card').style.display = 'none';
+
+      document.getElementById('driver-pickup-ride-price').innerText = `R$ ${valorFormatado}`;
+      document.getElementById('driver-pickup-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
+
+      exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng], true);
+    }
+
+    function iniciarViagemComPassageiro() {
+      if (!activeRideId || !pendingRide) return;
+      currentRideStatus = 'em_andamento';
+
+      db.ref('corridas/' + activeRideId).update({ status: 'em_andamento' });
+
+      const valorFormatado = (pendingRide.valor || 0).toFixed(2).replace('.', ',');
+      document.getElementById('driver-pickup-card').style.display = 'none';
+      document.getElementById('driver-active-card').style.display = 'block';
+
+      document.getElementById('driver-active-ride-price').innerText = `R$ ${valorFormatado}`;
+      document.getElementById('driver-active-passenger-info').innerHTML = `<b>Passageiro:</b> ${pendingRide.origem_endereco}`;
+
+      exibirSolicitacaoNoMapaMotorista([pendingRide.origem_lat, pendingRide.origem_lng], [pendingRide.destino_lat, pendingRide.destino_lng], true);
+    }
+
+    function finalizarCorrida() {
+      if (!activeRideId) return;
+
+      const valorFinal = pendingRide ? (pendingRide.valor || 0).toFixed(2).replace('.', ',') : '0,00';
+
+      const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+      db.ref('motoristas/' + keyPlate).child('saldoDevedor').transaction((currentBalance) => {
+        return (currentBalance || 0) + 1.00;
+      });
+
+      const idCorridaEncerrada = activeRideId;
+
+      activeRideId = null;
+      pendingRide = null;
+      currentRideStatus = null;
+      lastNotifiedRideId = null;
+
+      limparRotasMapaMotorista();
+
+      document.getElementById('driver-pickup-card').style.display = 'none';
+      document.getElementById('driver-active-card').style.display = 'none';
+      document.getElementById('driver-request-card').style.display = 'none';
+      if (!isDriverBlocked) {
+        document.getElementById('driver-empty-box').style.display = 'block';
+      }
+
+      db.ref('corridas/' + idCorridaEncerrada).remove();
+
+      alert(`🎉 Corrida concluída com sucesso!\n\n💰 Valor recebido: R$ ${valorFinal}\n📝 Taxa de R$ 1,00 adicionada ao seu saldo devedor.`);
+
+      db.ref('corridas').once('value');
+    }
+
+    function sairDaConta() {
+      if (wakeLock !== null) {
+        wakeLock.release().then(() => { wakeLock = null; });
+      }
+
+      limparRotasMapaMotorista();
+
+      if (currentUser) {
+        if (currentUser.role === 'motorista' && currentUser.plate) {
+          const keyPlate = currentUser.plate.replace(/[^a-zA-Z0-9]/g, '');
+          db.ref('motoristas/' + keyPlate).update({ online: false });
+        } else if (currentUser.role === 'passageiro' && currentUser.phone) {
+          const keyPhone = currentUser.phone.replace(/[^0-9a-zA-Z]/g, '');
+          if (keyPhone) db.ref('passageiros/' + keyPhone).remove();
+        }
+      }
+
+      localStorage.removeItem('sjn_role');
+      localStorage.removeItem('sjn_plate');
+      auth.signOut();
+      location.reload();
+    }
+
+    window.addEventListener('resize', () => {
+      if (passengerMap) passengerMap.invalidateSize();
+      if (driverMap) driverMap.invalidateSize();
+    });
+  </script>
 </body>
 </html>
